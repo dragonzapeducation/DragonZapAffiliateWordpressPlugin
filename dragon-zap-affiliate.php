@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Dragon Zap Affiliate
  * Description: Integrates WordPress with the Dragon Zap Affiliate API.
- * Version: 0.2.0
+ * Version: 0.3.0
  * Author: Dragon Zap
  * Requires PHP: 8.0
  * License: GPL-2.0-or-later
