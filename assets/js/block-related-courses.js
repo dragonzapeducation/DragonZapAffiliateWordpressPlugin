@@ -1,10 +1,44 @@
-(function (blocks, element, i18n, components) {
+(function (wp) {
+    wp = wp || {};
+
+    var blocks = wp.blocks;
+    var element = wp.element;
+    var i18n = wp.i18n;
+    var components = wp.components;
+    var blockEditor = wp.blockEditor || wp.editor;
+
+    if (!blocks || !blocks.registerBlockType || !element || !element.createElement) {
+        return;
+    }
+
     var el = element.createElement;
-    var __ = i18n.__;
-    var InspectorControls = (wp.blockEditor && wp.blockEditor.InspectorControls) || (wp.editor && wp.editor.InspectorControls);
-    var PanelBody = components.PanelBody;
-    var TextControl = components.TextControl;
-    var ToggleControl = components.ToggleControl;
+    var __ = i18n && typeof i18n.__ === 'function' ? i18n.__ : function (text) {
+        return text;
+    };
+
+    var InspectorControls = blockEditor && blockEditor.InspectorControls
+        ? blockEditor.InspectorControls
+        : function (props) {
+            return props && props.children ? props.children : null;
+        };
+
+    var PanelBody = components && components.PanelBody
+        ? components.PanelBody
+        : function (props) {
+            return el('div', props, props.children);
+        };
+
+    var TextControl = components && components.TextControl
+        ? components.TextControl
+        : function () {
+            return null;
+        };
+
+    var ToggleControl = components && components.ToggleControl
+        ? components.ToggleControl
+        : function () {
+            return null;
+        };
 
     blocks.registerBlockType('dragon-zap-affiliate/related-courses', {
         title: __('Dragon Zap Related Courses', 'dragon-zap-affiliate'),
@@ -55,4 +89,4 @@
             return null;
         },
     });
-})(window.wp.blocks, window.wp.element, window.wp.i18n, window.wp.components);
+})(window.wp || {});
