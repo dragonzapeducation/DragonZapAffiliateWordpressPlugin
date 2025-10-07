@@ -39,6 +39,9 @@ final class Dragon_Zap_Affiliate
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
         add_action('wp_ajax_dza_test_connection', [$this, 'handle_test_request']);
+        
+        $this->ensure_sdk_autoload();
+
     }
 
     public static function get_instance(string $plugin_file): self
@@ -145,8 +148,6 @@ final class Dragon_Zap_Affiliate
                 'restrictionsEmpty' => __('No restricted scopes were reported for this API key.', 'dragon-zap-affiliate'),
                 'restrictionsHelp' => __('Restricted scopes require additional approval. Contact Dragon Zap support to request access.', 'dragon-zap-affiliate'),
                 'endpointTitle' => __('Affiliate test endpoint', 'dragon-zap-affiliate'),
-                'endpointDescription' => __('Scopes are returned from the Affiliate API test endpoint below. You can call it directly with your API key to review the raw response.', 'dragon-zap-affiliate'),
-                'testEndpointUrl' => trailingslashit($this->get_api_base_uri()) . 'test',
             ]
         );
     }
@@ -237,7 +238,6 @@ final class Dragon_Zap_Affiliate
         }
 
         try {
-            $this->ensure_sdk_autoload();
             $client = new \DragonZap\AffiliateApi\Client($api_key, $this->get_api_base_uri());
             $response = $client->testConnection();
         } catch (\DragonZap\AffiliateApi\Exceptions\ApiException $exception) {

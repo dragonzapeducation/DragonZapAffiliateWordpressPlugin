@@ -146,18 +146,7 @@
                         )
                     ];
 
-                    var endpointUrl = getString('testEndpointUrl', '');
-
-                    if (endpointUrl) {
-                        blocks.push(
-                            createEndpointBlock(
-                                getString('endpointTitle', 'Affiliate test endpoint'),
-                                endpointUrl,
-                                getString('endpointDescription', '')
-                            )
-                        );
-                    }
-
+                 
                     renderResult(
                         'success',
                         (response.data && response.data.message) || getString('testSuccessMessage', 'Connection successful!'),
