@@ -44,6 +44,9 @@ final class Dragon_Zap_Affiliate
         add_filter('the_content', [$this, 'append_related_courses_to_content']);
         add_action('save_post', [$this, 'clear_related_courses_cache']);
         add_action('delete_post', [$this, 'clear_related_courses_cache']);
+        
+        $this->ensure_sdk_autoload();
+
     }
 
     public static function get_instance(string $plugin_file): self
@@ -125,6 +128,13 @@ final class Dragon_Zap_Affiliate
             return;
         }
 
+        wp_enqueue_style(
+            'dragon-zap-affiliate-admin',
+            $this->plugin_url('assets/css/admin.css'),
+            [],
+            $this->plugin_version()
+        );
+
         wp_enqueue_script(
             'dragon-zap-affiliate-admin',
             $this->plugin_url('assets/js/admin.js'),
@@ -142,6 +152,12 @@ final class Dragon_Zap_Affiliate
                 'testingText' => __('Testing...', 'dragon-zap-affiliate'),
                 'testSuccessMessage' => __('Connection successful!', 'dragon-zap-affiliate'),
                 'testErrorMessage' => __('Connection failed. Please check your API key and try again.', 'dragon-zap-affiliate'),
+                'scopesTitle' => __('Authorized scopes', 'dragon-zap-affiliate'),
+                'scopesEmpty' => __('No scopes were returned for this API key.', 'dragon-zap-affiliate'),
+                'restrictionsTitle' => __('Restricted scopes', 'dragon-zap-affiliate'),
+                'restrictionsEmpty' => __('No restricted scopes were reported for this API key.', 'dragon-zap-affiliate'),
+                'restrictionsHelp' => __('Restricted scopes require additional approval. Contact Dragon Zap support to request access.', 'dragon-zap-affiliate'),
+                'endpointTitle' => __('Affiliate test endpoint', 'dragon-zap-affiliate'),
             ]
         );
     }
@@ -232,7 +248,6 @@ final class Dragon_Zap_Affiliate
         }
 
         try {
-            $this->ensure_sdk_autoload();
             $client = new \DragonZap\AffiliateApi\Client($api_key, $this->get_api_base_uri());
             $response = $client->testConnection();
         } catch (\DragonZap\AffiliateApi\Exceptions\ApiException $exception) {
