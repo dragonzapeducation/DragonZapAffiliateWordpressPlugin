@@ -30,3 +30,16 @@
     margin: 0;
     color: #50575e;
 }
+
+#dragon-zap-affiliate-test-result .dragon-zap-affiliate-endpoint {
+    display: inline-block;
+    margin: 0 0 0.5em;
+    padding: 0.25em 0.5em;
+    background: #f6f7f7;
+    border: 1px solid #dcdcde;
+    border-radius: 3px;
+    font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    color: #1d2327;
+    word-break: break-all;
+}

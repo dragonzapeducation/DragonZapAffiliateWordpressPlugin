@@ -144,6 +144,9 @@ final class Dragon_Zap_Affiliate
                 'restrictionsTitle' => __('Restricted scopes', 'dragon-zap-affiliate'),
                 'restrictionsEmpty' => __('No restricted scopes were reported for this API key.', 'dragon-zap-affiliate'),
                 'restrictionsHelp' => __('Restricted scopes require additional approval. Contact Dragon Zap support to request access.', 'dragon-zap-affiliate'),
+                'endpointTitle' => __('Affiliate test endpoint', 'dragon-zap-affiliate'),
+                'endpointDescription' => __('Scopes are returned from the Affiliate API test endpoint below. You can call it directly with your API key to review the raw response.', 'dragon-zap-affiliate'),
+                'testEndpointUrl' => trailingslashit($this->get_api_base_uri()) . 'test',
             ]
         );
     }

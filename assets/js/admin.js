@@ -49,6 +49,29 @@
         return $block;
     }
 
+    function createEndpointBlock(title, url, description) {
+        var $block = $('<div>').addClass('dragon-zap-affiliate-scope-block');
+
+        if (title) {
+            $block.append($('<h3>').text(title));
+        }
+
+        if (url) {
+            $block.append(
+                $('<code>')
+                    .addClass('dragon-zap-affiliate-endpoint')
+                    .attr('aria-label', title || getString('endpointTitle', 'Affiliate test endpoint'))
+                    .text(url)
+            );
+        }
+
+        if (description) {
+            $block.append($('<p>').addClass('description').text(description));
+        }
+
+        return $block;
+    }
+
     function renderResult(type, message, blocks) {
         var $result = getResultContainer();
 
@@ -122,6 +145,18 @@
                             getString('restrictionsHelp', '')
                         )
                     ];
+
+                    var endpointUrl = getString('testEndpointUrl', '');
+
+                    if (endpointUrl) {
+                        blocks.push(
+                            createEndpointBlock(
+                                getString('endpointTitle', 'Affiliate test endpoint'),
+                                endpointUrl,
+                                getString('endpointDescription', '')
+                            )
+                        );
+                    }
 
                     renderResult(
                         'success',
