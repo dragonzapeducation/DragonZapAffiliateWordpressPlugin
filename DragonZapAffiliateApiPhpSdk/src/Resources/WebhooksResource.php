@@ -6,8 +6,11 @@ use DragonZap\AffiliateApi\Client;
 
 class WebhooksResource
 {
-    public function __construct(private readonly Client $client)
+    private Client $client;
+
+    public function __construct(Client $client)
     {
+        $this->client = $client;
     }
 
     /**

@@ -6,11 +6,15 @@ use RuntimeException;
 
 class CurlHttpClient implements HttpClientInterface
 {
-    public function __construct(private readonly ?float $timeout = 10.0)
+    private ?float $timeout;
+
+    public function __construct(?float $timeout = 10.0)
     {
         if (!function_exists('curl_init')) {
             throw new RuntimeException('cURL extension is required to use CurlHttpClient.');
         }
+
+        $this->timeout = $timeout;
     }
 
     /**
