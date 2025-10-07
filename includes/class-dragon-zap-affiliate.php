@@ -39,7 +39,8 @@ final class Dragon_Zap_Affiliate
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
         add_action('wp_ajax_dza_test_connection', [$this, 'handle_test_request']);
-        add_action('wp_enqueue_scripts', [$this, 'register_frontend_assets']);
+        add_action('init', [$this, 'register_frontend_assets']);
+        add_action('init', [$this, 'register_blocks']);
         add_action('widgets_init', [$this, 'register_widgets']);
         add_filter('the_content', [$this, 'append_related_courses_to_content']);
         add_action('save_post', [$this, 'clear_related_courses_cache']);
@@ -310,6 +311,50 @@ final class Dragon_Zap_Affiliate
         );
     }
 
+    public function register_blocks(): void
+    {
+        if (! function_exists('register_block_type')) {
+            return;
+        }
+
+        $script_handle = 'dragon-zap-affiliate-related-courses-block';
+
+        wp_register_script(
+            $script_handle,
+            $this->plugin_url('assets/js/block-related-courses.js'),
+            ['wp-blocks', 'wp-element', 'wp-i18n', 'wp-components', 'wp-block-editor', 'wp-editor'],
+            $this->plugin_version(),
+            true
+        );
+
+        $editor_style_handle = 'dragon-zap-affiliate-related-courses-block-editor';
+
+        wp_register_style(
+            $editor_style_handle,
+            $this->plugin_url('assets/css/block-related-courses-editor.css'),
+            ['wp-edit-blocks'],
+            $this->plugin_version()
+        );
+
+        register_block_type('dragon-zap-affiliate/related-courses', [
+            'api_version' => 2,
+            'editor_script' => $script_handle,
+            'editor_style' => $editor_style_handle,
+            'style' => 'dragon-zap-affiliate-related-courses',
+            'render_callback' => [$this, 'render_related_courses_block'],
+            'attributes' => [
+                'title' => [
+                    'type' => 'string',
+                    'default' => __('Recommended Courses', 'dragon-zap-affiliate'),
+                ],
+                'showTitle' => [
+                    'type' => 'boolean',
+                    'default' => true,
+                ],
+            ],
+        ]);
+    }
+
     public function register_widgets(): void
     {
         $widget_file = plugin_dir_path($this->plugin_file) . 'includes/class-dragon-zap-affiliate-related-courses-widget.php';
@@ -321,6 +366,45 @@ final class Dragon_Zap_Affiliate
         if (class_exists('Dragon_Zap_Affiliate_Related_Courses_Widget')) {
             register_widget('Dragon_Zap_Affiliate_Related_Courses_Widget');
         }
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @param string $content
+     * @param mixed $block
+     */
+    public function render_related_courses_block(array $attributes = [], string $content = '', $block = null): string
+    {
+        $show_title = isset($attributes['showTitle']) ? (bool) $attributes['showTitle'] : true;
+        $title = '';
+        $is_editor_request = is_admin() || (function_exists('wp_is_json_request') && wp_is_json_request());
+
+        if ($show_title) {
+            $title = isset($attributes['title']) && is_string($attributes['title'])
+                ? $attributes['title']
+                : __('Recommended Courses', 'dragon-zap-affiliate');
+        }
+
+        $post_id = get_the_ID();
+
+        if (! $post_id || get_post_type($post_id) !== 'post') {
+            if ($is_editor_request) {
+                return '<p>' . esc_html__('Related courses will appear on single posts.', 'dragon-zap-affiliate') . '</p>';
+            }
+
+            return '';
+        }
+
+        $markup = $this->get_related_courses_markup((int) $post_id, [
+            'title' => $title,
+            'context' => 'block',
+        ]);
+
+        if ($markup === '' && $is_editor_request) {
+            return '<p>' . esc_html__('No related courses are available yet for this post.', 'dragon-zap-affiliate') . '</p>';
+        }
+
+        return $markup;
     }
 
     /**
