@@ -172,6 +172,7 @@ final class Dragon_Zap_Affiliate
 
     public function handle_test_request(): void
     {
+
         if (! current_user_can('manage_options')) {
             wp_send_json_error(['message' => esc_html__('Unauthorized request.', 'dragon-zap-affiliate')], 403);
         }
