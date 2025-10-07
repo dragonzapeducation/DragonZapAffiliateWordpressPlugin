@@ -10,13 +10,25 @@ final class Dragon_Zap_Affiliate
     private const NONCE_ACTION = 'dragon_zap_affiliate_test';
     private const API_BASE_URI = 'https://affiliate.dragonzap.com/api/v1';
 
-    private static ?self $instance = null;
+    /**
+     * @var self|null
+     */
+    private static $instance = null;
 
-    private string $plugin_file;
+    /**
+     * @var string
+     */
+    private $plugin_file;
 
-    private ?string $settings_page_hook = null;
+    /**
+     * @var string|null
+     */
+    private $settings_page_hook = null;
 
-    private bool $sdk_autoloader_registered = false;
+    /**
+     * @var bool
+     */
+    private $sdk_autoloader_registered = false;
 
     private function __construct(string $plugin_file)
     {
