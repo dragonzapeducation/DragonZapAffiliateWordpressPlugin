@@ -7,8 +7,9 @@ if (! defined('ABSPATH')) {
 final class Dragon_Zap_Affiliate
 {
     private const OPTION_API_KEY = 'dragon_zap_affiliate_api_key';
+    private const OPTION_API_BASE_URI = 'dragon_zap_affiliate_api_base_uri';
     private const NONCE_ACTION = 'dragon_zap_affiliate_test';
-    private const API_BASE_URI = 'https://affiliate.dragonzap.com/api/v1';
+    private const DEFAULT_API_BASE_URI = 'https://affiliate.dragonzap.com/api/v1';
 
     /**
      * @var self|null
@@ -88,6 +89,24 @@ final class Dragon_Zap_Affiliate
             'dragon_zap_affiliate',
             'dragon_zap_affiliate_general'
         );
+
+        register_setting(
+            'dragon_zap_affiliate',
+            self::OPTION_API_BASE_URI,
+            [
+                'sanitize_callback' => [$this, 'sanitize_api_base_uri'],
+                'type' => 'string',
+                'default' => self::DEFAULT_API_BASE_URI,
+            ]
+        );
+
+        add_settings_field(
+            self::OPTION_API_BASE_URI,
+            __('API Base URL', 'dragon-zap-affiliate'),
+            [$this, 'render_api_base_uri_field'],
+            'dragon_zap_affiliate',
+            'dragon_zap_affiliate_general'
+        );
     }
 
     public function enqueue_assets(string $hook): void
@@ -158,6 +177,19 @@ final class Dragon_Zap_Affiliate
         echo '<p class="description">' . esc_html__('The API key is stored securely in your WordPress options table.', 'dragon-zap-affiliate') . '</p>';
     }
 
+    public function render_api_base_uri_field(): void
+    {
+        $value = $this->get_api_base_uri();
+
+        printf(
+            '<input type="url" id="%1$s" name="%1$s" value="%2$s" class="regular-text" spellcheck="false" />',
+            esc_attr(self::OPTION_API_BASE_URI),
+            esc_attr($value)
+        );
+
+        echo '<p class="description">' . esc_html__('Change the API base URL if instructed by Dragon Zap support. The default value works for most integrations.', 'dragon-zap-affiliate') . '</p>';
+    }
+
     /**
      * @param mixed $value
      */
@@ -191,7 +223,7 @@ final class Dragon_Zap_Affiliate
 
         try {
             $this->ensure_sdk_autoload();
-            $client = new \DragonZap\AffiliateApi\Client($api_key, self::API_BASE_URI);
+            $client = new \DragonZap\AffiliateApi\Client($api_key, $this->get_api_base_uri());
             $response = $client->testConnection();
         } catch (\DragonZap\AffiliateApi\Exceptions\ApiException $exception) {
             wp_send_json_error([
@@ -270,5 +302,46 @@ final class Dragon_Zap_Affiliate
         }
 
         return $this->sanitize_api_key($value);
+    }
+
+    private function get_api_base_uri(): string
+    {
+        $value = get_option(self::OPTION_API_BASE_URI, self::DEFAULT_API_BASE_URI);
+
+        if (! is_string($value) || $value === '') {
+            return self::DEFAULT_API_BASE_URI;
+        }
+
+        $value = $this->sanitize_api_base_uri($value);
+
+        if ($value === '') {
+            return self::DEFAULT_API_BASE_URI;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param mixed $value
+     */
+    public function sanitize_api_base_uri($value): string
+    {
+        if (! is_string($value)) {
+            return self::DEFAULT_API_BASE_URI;
+        }
+
+        $value = trim($value);
+
+        if ($value === '') {
+            return self::DEFAULT_API_BASE_URI;
+        }
+
+        $value = esc_url_raw($value);
+
+        if (! is_string($value) || $value === '') {
+            return self::DEFAULT_API_BASE_URI;
+        }
+
+        return untrailingslashit($value);
     }
 }
