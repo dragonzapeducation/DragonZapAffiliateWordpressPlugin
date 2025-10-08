@@ -117,6 +117,121 @@
                 previewProps.className = previewClass;
             }
 
+            var preventPreviewNavigation = function (event) {
+                if (event && typeof event.preventDefault === 'function') {
+                    event.preventDefault();
+                }
+            };
+
+            var escapeForSvg = function (value) {
+                return String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            };
+
+            var placeholderLabel = escapeForSvg(__('Course', 'dragon-zap-affiliate'));
+            var placeholderSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">' +
+                '<rect width="96" height="96" rx="12" fill="#e2e8f0" />' +
+                '<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="12" fill="#475569" font-family="Arial, sans-serif">' +
+                placeholderLabel +
+                '</text>' +
+                '</svg>';
+            var placeholderImage = 'data:image/svg+xml;utf8,' + encodeURIComponent(placeholderSvg);
+
+            var sampleCourses = [
+                {
+                    title: __('Unity 3D Starter Kit', 'dragon-zap-affiliate'),
+                    description: __('Build your first real-time game world while mastering Unity fundamentals.', 'dragon-zap-affiliate'),
+                    price: 'USD 19.99',
+                },
+                {
+                    title: __('Master Unreal Blueprints', 'dragon-zap-affiliate'),
+                    description: __('Create gameplay systems visually and prototype ideas faster than ever.', 'dragon-zap-affiliate'),
+                    price: 'USD 29.99',
+                },
+                {
+                    title: __('Game Design Bootcamp', 'dragon-zap-affiliate'),
+                    description: __('Learn to balance mechanics, narrative, and player experience like a pro.', 'dragon-zap-affiliate'),
+                    price: 'USD 24.99',
+                },
+            ];
+
+            var containerClasses = ['dragon-zap-affiliate-related-courses', 'dragon-zap-affiliate-related-courses--block'];
+
+            if (!attributes.showImages) {
+                containerClasses.push('dragon-zap-affiliate-related-courses--no-images');
+            }
+
+            if (attributes.customClass) {
+                containerClasses.push(attributes.customClass);
+            }
+
+            var styleVariables = {};
+
+            if (attributes.backgroundColor) {
+                styleVariables['--dza-related-bg'] = attributes.backgroundColor;
+            }
+
+            if (attributes.textColor) {
+                styleVariables['--dza-related-text'] = attributes.textColor;
+                styleVariables['--dza-related-muted'] = attributes.textColor;
+            }
+
+            if (attributes.accentColor) {
+                styleVariables['--dza-related-accent'] = attributes.accentColor;
+            }
+
+            if (attributes.borderColor) {
+                styleVariables['--dza-related-border'] = attributes.borderColor;
+            }
+
+            var headingText = attributes.showTitle
+                ? (attributes.title || __('Recommended Courses', 'dragon-zap-affiliate'))
+                : '';
+
+            var courseItems = sampleCourses.map(function (course, index) {
+                var imageElement = null;
+
+                if (attributes.showImages) {
+                    imageElement = el('a', {
+                        className: 'dragon-zap-affiliate-related-courses__image-link',
+                        href: '#',
+                        onClick: preventPreviewNavigation,
+                    },
+                        el('img', {
+                            className: 'dragon-zap-affiliate-related-courses__image',
+                            src: placeholderImage,
+                            alt: course.title,
+                            loading: 'lazy',
+                        })
+                    );
+                }
+
+                var priceElement = attributes.showPrice
+                    ? el('div', { className: 'dragon-zap-affiliate-related-courses__price' }, course.price)
+                    : null;
+
+                var descriptionElement = attributes.showDescription
+                    ? el('p', { className: 'dragon-zap-affiliate-related-courses__description' }, course.description)
+                    : null;
+
+                return el('li', { key: 'course-' + index, className: 'dragon-zap-affiliate-related-courses__item' },
+                    imageElement,
+                    el('div', { className: 'dragon-zap-affiliate-related-courses__content' },
+                        el('a', {
+                            className: 'dragon-zap-affiliate-related-courses__title',
+                            href: '#',
+                            onClick: preventPreviewNavigation,
+                        }, course.title),
+                        priceElement,
+                        descriptionElement
+                    )
+                );
+            });
+
             return [
                 el(InspectorControls, { key: 'controls' },
                     el(PanelBody, { title: __('Display Settings', 'dragon-zap-affiliate'), initialOpen: true },
@@ -239,7 +354,15 @@
                     )
                 ),
                 el('div', previewProps,
-                    el('p', {}, __('Related courses will be shown on single posts after the content or wherever you place this block.', 'dragon-zap-affiliate'))
+                    el('div', {
+                        className: containerClasses.join(' '),
+                        style: Object.keys(styleVariables).length ? styleVariables : undefined,
+                    },
+                        headingText !== ''
+                            ? el('h2', { className: 'dragon-zap-affiliate-related-courses__heading' }, headingText)
+                            : null,
+                        el('ul', { className: 'dragon-zap-affiliate-related-courses__list' }, courseItems)
+                    )
                 )
             ];
         },
