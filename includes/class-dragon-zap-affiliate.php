@@ -43,7 +43,7 @@ final class Dragon_Zap_Affiliate
         add_action('init', [$this, 'register_frontend_assets']);
         add_action('init', [$this, 'register_blocks']);
         add_action('widgets_init', [$this, 'register_widgets']);
-        add_filter('the_content', [$this, 'append_related_courses_to_content']);
+      
         add_action('save_post', [$this, 'clear_related_courses_cache']);
         add_action('delete_post', [$this, 'clear_related_courses_cache']);
         
