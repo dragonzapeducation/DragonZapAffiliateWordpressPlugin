@@ -57,6 +57,38 @@
                 type: 'boolean',
                 default: true,
             },
+            showImages: {
+                type: 'boolean',
+                default: true,
+            },
+            showDescription: {
+                type: 'boolean',
+                default: true,
+            },
+            showPrice: {
+                type: 'boolean',
+                default: true,
+            },
+            backgroundColor: {
+                type: 'string',
+                default: '',
+            },
+            textColor: {
+                type: 'string',
+                default: '',
+            },
+            accentColor: {
+                type: 'string',
+                default: '',
+            },
+            borderColor: {
+                type: 'string',
+                default: '',
+            },
+            customClass: {
+                type: 'string',
+                default: '',
+            },
         },
         edit: function (props) {
             var attributes = props.attributes;
@@ -77,11 +109,73 @@
                             onChange: function (value) {
                                 props.setAttributes({ title: value });
                             },
+                        }),
+                        el(ToggleControl, {
+                            label: __('Show course images', 'dragon-zap-affiliate'),
+                            checked: attributes.showImages,
+                            onChange: function (value) {
+                                props.setAttributes({ showImages: value });
+                            },
+                        }),
+                        el(ToggleControl, {
+                            label: __('Show descriptions', 'dragon-zap-affiliate'),
+                            checked: attributes.showDescription,
+                            onChange: function (value) {
+                                props.setAttributes({ showDescription: value });
+                            },
+                        }),
+                        el(ToggleControl, {
+                            label: __('Show prices', 'dragon-zap-affiliate'),
+                            checked: attributes.showPrice,
+                            onChange: function (value) {
+                                props.setAttributes({ showPrice: value });
+                            },
+                        })
+                    ),
+                    el(PanelBody, { title: __('Style Settings', 'dragon-zap-affiliate'), initialOpen: false },
+                        el(TextControl, {
+                            label: __('Background color', 'dragon-zap-affiliate'),
+                            placeholder: '#ffffff',
+                            value: attributes.backgroundColor,
+                            onChange: function (value) {
+                                props.setAttributes({ backgroundColor: value });
+                            },
+                        }),
+                        el(TextControl, {
+                            label: __('Text color', 'dragon-zap-affiliate'),
+                            placeholder: '#0f172a',
+                            value: attributes.textColor,
+                            onChange: function (value) {
+                                props.setAttributes({ textColor: value });
+                            },
+                        }),
+                        el(TextControl, {
+                            label: __('Link & accent color', 'dragon-zap-affiliate'),
+                            placeholder: '#1d4ed8',
+                            value: attributes.accentColor,
+                            onChange: function (value) {
+                                props.setAttributes({ accentColor: value });
+                            },
+                        }),
+                        el(TextControl, {
+                            label: __('Border color', 'dragon-zap-affiliate'),
+                            placeholder: '#e2e8f0',
+                            value: attributes.borderColor,
+                            onChange: function (value) {
+                                props.setAttributes({ borderColor: value });
+                            },
+                        }),
+                        el(TextControl, {
+                            label: __('Additional CSS classes', 'dragon-zap-affiliate'),
+                            value: attributes.customClass,
+                            onChange: function (value) {
+                                props.setAttributes({ customClass: value });
+                            },
                         })
                     )
                 ),
                 el('div', { className: 'dragon-zap-affiliate-related-courses-block-preview', key: 'preview' },
-                    el('p', {}, __('Related courses will be shown on single posts after the content.', 'dragon-zap-affiliate'))
+                    el('p', {}, __('Related courses will be shown on single posts after the content or wherever you place this block.', 'dragon-zap-affiliate'))
                 )
             ];
         },
