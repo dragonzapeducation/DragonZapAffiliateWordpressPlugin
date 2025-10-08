@@ -9,6 +9,7 @@ final class Dragon_Zap_Affiliate
     private const OPTION_API_KEY = 'dragon_zap_affiliate_api_key';
     private const OPTION_API_BASE_URI = 'dragon_zap_affiliate_api_base_uri';
     private const NONCE_ACTION = 'dragon_zap_affiliate_test';
+    private const OPTION_AUTO_APPEND = 'dragon_zap_affiliate_auto_append';
     private const DEFAULT_API_BASE_URI = 'https://affiliate.dragonzap.com/api/v1';
 
     /**
@@ -121,6 +122,24 @@ final class Dragon_Zap_Affiliate
             'dragon_zap_affiliate',
             'dragon_zap_affiliate_general'
         );
+
+        register_setting(
+            'dragon_zap_affiliate',
+            self::OPTION_AUTO_APPEND,
+            [
+                'sanitize_callback' => [$this, 'sanitize_checkbox_value'],
+                'type' => 'boolean',
+                'default' => true,
+            ]
+        );
+
+        add_settings_field(
+            self::OPTION_AUTO_APPEND,
+            __('Automatically append widget', 'dragon-zap-affiliate'),
+            [$this, 'render_auto_append_field'],
+            'dragon_zap_affiliate',
+            'dragon_zap_affiliate_general'
+        );
     }
 
     public function enqueue_assets(string $hook): void
@@ -215,6 +234,19 @@ final class Dragon_Zap_Affiliate
         );
 
         echo '<p class="description">' . esc_html__('Change the API base URL if instructed by Dragon Zap support. The default value works for most integrations.', 'dragon-zap-affiliate') . '</p>';
+    }
+
+    public function render_auto_append_field(): void
+    {
+        $value = $this->is_auto_append_enabled();
+
+        printf(
+            '<label><input type="checkbox" name="%1$s" value="1" %2$s /> %3$s</label><p class="description">%4$s</p>',
+            esc_attr(self::OPTION_AUTO_APPEND),
+            checked($value, true, false),
+            esc_html__('Display the related courses widget after the post content by default.', 'dragon-zap-affiliate'),
+            esc_html__('Uncheck to place the widget manually using the block or widget editor.', 'dragon-zap-affiliate')
+        );
     }
 
     /**
@@ -351,6 +383,38 @@ final class Dragon_Zap_Affiliate
                     'type' => 'boolean',
                     'default' => true,
                 ],
+                'showImages' => [
+                    'type' => 'boolean',
+                    'default' => true,
+                ],
+                'showDescription' => [
+                    'type' => 'boolean',
+                    'default' => true,
+                ],
+                'showPrice' => [
+                    'type' => 'boolean',
+                    'default' => true,
+                ],
+                'backgroundColor' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'textColor' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'accentColor' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'borderColor' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'customClass' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
             ],
         ]);
     }
@@ -385,6 +449,25 @@ final class Dragon_Zap_Affiliate
                 : __('Recommended Courses', 'dragon-zap-affiliate');
         }
 
+        $show_images = isset($attributes['showImages']) ? (bool) $attributes['showImages'] : true;
+        $show_description = isset($attributes['showDescription']) ? (bool) $attributes['showDescription'] : true;
+        $show_price = isset($attributes['showPrice']) ? (bool) $attributes['showPrice'] : true;
+        $background_color = isset($attributes['backgroundColor']) && is_string($attributes['backgroundColor'])
+            ? $attributes['backgroundColor']
+            : '';
+        $text_color = isset($attributes['textColor']) && is_string($attributes['textColor'])
+            ? $attributes['textColor']
+            : '';
+        $accent_color = isset($attributes['accentColor']) && is_string($attributes['accentColor'])
+            ? $attributes['accentColor']
+            : '';
+        $border_color = isset($attributes['borderColor']) && is_string($attributes['borderColor'])
+            ? $attributes['borderColor']
+            : '';
+        $custom_class = isset($attributes['customClass']) && is_string($attributes['customClass'])
+            ? $attributes['customClass']
+            : '';
+
         $post_id = get_the_ID();
 
         if (! $post_id || get_post_type($post_id) !== 'post') {
@@ -398,6 +481,14 @@ final class Dragon_Zap_Affiliate
         $markup = $this->get_related_courses_markup((int) $post_id, [
             'title' => $title,
             'context' => 'block',
+            'show_images' => $show_images,
+            'show_description' => $show_description,
+            'show_price' => $show_price,
+            'background_color' => $background_color,
+            'text_color' => $text_color,
+            'accent_color' => $accent_color,
+            'border_color' => $border_color,
+            'custom_class' => $custom_class,
         ]);
 
         if ($markup === '' && $is_editor_request) {
@@ -417,10 +508,14 @@ final class Dragon_Zap_Affiliate
             return $content;
         }
 
+        if (! $this->is_auto_append_enabled()) {
+            return $content;
+        }
+
         $post_id = absint(get_the_ID());
 
         if ($post_id <= 0) {
-            
+
             return $content;
         }
 
@@ -599,18 +694,75 @@ final class Dragon_Zap_Affiliate
 
         $title = $options['title'] ?? __('Recommended Courses', 'dragon-zap-affiliate');
         $context = isset($options['context']) ? (string) $options['context'] : '';
-        $context_class = $context !== '' ? ' dragon-zap-affiliate-related-courses--' . sanitize_html_class($context) : '';
+        $show_images = isset($options['show_images']) ? (bool) $options['show_images'] : true;
+        $show_description = isset($options['show_description']) ? (bool) $options['show_description'] : true;
+        $show_price = isset($options['show_price']) ? (bool) $options['show_price'] : true;
+        $background_color = isset($options['background_color']) ? (string) $options['background_color'] : '';
+        $text_color = isset($options['text_color']) ? (string) $options['text_color'] : '';
+        $accent_color = isset($options['accent_color']) ? (string) $options['accent_color'] : '';
+        $border_color = isset($options['border_color']) ? (string) $options['border_color'] : '';
+        $custom_class = isset($options['custom_class']) ? (string) $options['custom_class'] : '';
+
+        $classes = ['dragon-zap-affiliate-related-courses'];
+
+        if ($context !== '') {
+            $classes[] = 'dragon-zap-affiliate-related-courses--' . sanitize_html_class($context);
+        }
+
+        if (! $show_images) {
+            $classes[] = 'dragon-zap-affiliate-related-courses--no-images';
+        }
+
+        if ($custom_class !== '') {
+            $custom_classnames = preg_split('/\s+/', $custom_class) ?: [];
+
+            foreach ($custom_classnames as $classname) {
+                $classname = trim($classname);
+
+                if ($classname !== '') {
+                    $classes[] = sanitize_html_class($classname);
+                }
+            }
+        }
+
+        $style_variables = [];
+        $background_color = $this->sanitize_color_value($background_color);
+        $text_color = $this->sanitize_color_value($text_color);
+        $accent_color = $this->sanitize_color_value($accent_color);
+        $border_color = $this->sanitize_color_value($border_color);
+
+        if ($background_color !== '') {
+            $style_variables[] = '--dza-related-bg: ' . $background_color . ';';
+        }
+
+        if ($text_color !== '') {
+            $style_variables[] = '--dza-related-text: ' . $text_color . ';';
+            $style_variables[] = '--dza-related-muted: ' . $text_color . ';';
+        }
+
+        if ($accent_color !== '') {
+            $style_variables[] = '--dza-related-accent: ' . $accent_color . ';';
+        }
+
+        if ($border_color !== '') {
+            $style_variables[] = '--dza-related-border: ' . $border_color . ';';
+        }
+
+        $class_attribute = implode(' ', array_unique(array_filter($classes)));
+        $style_attribute = $style_variables !== []
+            ? ' style="' . esc_attr(implode(' ', $style_variables)) . '"'
+            : '';
 
         ob_start();
         ?>
-        <div class="dragon-zap-affiliate-related-courses<?php echo esc_attr($context_class); ?>">
+        <div class="<?php echo esc_attr($class_attribute); ?>"<?php echo $style_attribute; ?>>
             <?php if ($title !== '') : ?>
                 <h2 class="dragon-zap-affiliate-related-courses__heading"><?php echo esc_html($title); ?></h2>
             <?php endif; ?>
             <ul class="dragon-zap-affiliate-related-courses__list">
                 <?php foreach ($courses as $course) : ?>
                     <li class="dragon-zap-affiliate-related-courses__item">
-                        <?php if (! empty($course['image'])) : ?>
+                        <?php if ($show_images && ! empty($course['image'])) : ?>
                             <a class="dragon-zap-affiliate-related-courses__image-link" href="<?php echo esc_url($course['url']); ?>" target="_blank" rel="nofollow noopener">
                                 <img class="dragon-zap-affiliate-related-courses__image" src="<?php echo esc_url($course['image']); ?>" alt="<?php echo esc_attr($course['title']); ?>" loading="lazy" />
                             </a>
@@ -619,10 +771,10 @@ final class Dragon_Zap_Affiliate
                             <a class="dragon-zap-affiliate-related-courses__title" href="<?php echo esc_url($course['url']); ?>" target="_blank" rel="nofollow noopener">
                                 <?php echo esc_html($course['title']); ?>
                             </a>
-                            <?php if ($course['price'] !== null) : ?>
+                            <?php if ($show_price && $course['price'] !== null) : ?>
                                 <div class="dragon-zap-affiliate-related-courses__price"><?php echo esc_html($this->format_course_price($course)); ?></div>
                             <?php endif; ?>
-                            <?php if (! empty($course['description'])) : ?>
+                            <?php if ($show_description && ! empty($course['description'])) : ?>
                                 <p class="dragon-zap-affiliate-related-courses__description"><?php echo esc_html($course['description']); ?></p>
                             <?php endif; ?>
                         </div>
@@ -633,6 +785,39 @@ final class Dragon_Zap_Affiliate
         <?php
 
         return trim((string) ob_get_clean());
+    }
+
+    private function is_auto_append_enabled(): bool
+    {
+        $value = get_option(self::OPTION_AUTO_APPEND, true);
+
+        if (is_string($value)) {
+            return $value === '1';
+        }
+
+        return (bool) $value;
+    }
+
+    public function sanitize_checkbox_value($value): bool
+    {
+        if (is_string($value)) {
+            $value = trim($value);
+        }
+
+        return ! empty($value);
+    }
+
+    private function sanitize_color_value(string $value): string
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        $sanitized = sanitize_hex_color($value);
+
+        return is_string($sanitized) ? $sanitized : '';
     }
 
     private function get_related_courses_transient_key(int $post_id): string
