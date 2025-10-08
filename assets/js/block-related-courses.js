@@ -40,6 +40,10 @@
             return null;
         };
 
+    var PanelColorSettings = (blockEditor && blockEditor.PanelColorSettings)
+        ? blockEditor.PanelColorSettings
+        : (components && components.PanelColorSettings ? components.PanelColorSettings : null);
+
     var useBlockProps = blockEditor && typeof blockEditor.useBlockProps === 'function'
         ? blockEditor.useBlockProps
         : function () {
@@ -153,38 +157,78 @@
                         })
                     ),
                     el(PanelBody, { title: __('Style Settings', 'dragon-zap-affiliate'), initialOpen: false },
-                        el(TextControl, {
-                            label: __('Background color', 'dragon-zap-affiliate'),
-                            placeholder: '#ffffff',
-                            value: attributes.backgroundColor,
-                            onChange: function (value) {
-                                props.setAttributes({ backgroundColor: value });
-                            },
-                        }),
-                        el(TextControl, {
-                            label: __('Text color', 'dragon-zap-affiliate'),
-                            placeholder: '#0f172a',
-                            value: attributes.textColor,
-                            onChange: function (value) {
-                                props.setAttributes({ textColor: value });
-                            },
-                        }),
-                        el(TextControl, {
-                            label: __('Link & accent color', 'dragon-zap-affiliate'),
-                            placeholder: '#1d4ed8',
-                            value: attributes.accentColor,
-                            onChange: function (value) {
-                                props.setAttributes({ accentColor: value });
-                            },
-                        }),
-                        el(TextControl, {
-                            label: __('Border color', 'dragon-zap-affiliate'),
-                            placeholder: '#e2e8f0',
-                            value: attributes.borderColor,
-                            onChange: function (value) {
-                                props.setAttributes({ borderColor: value });
-                            },
-                        }),
+                        PanelColorSettings
+                            ? el(PanelColorSettings, {
+                                title: __('Color settings', 'dragon-zap-affiliate'),
+                                colorSettings: [
+                                    {
+                                        value: attributes.backgroundColor,
+                                        onChange: function (value) {
+                                            props.setAttributes({ backgroundColor: value || '' });
+                                        },
+                                        label: __('Background color', 'dragon-zap-affiliate'),
+                                    },
+                                    {
+                                        value: attributes.textColor,
+                                        onChange: function (value) {
+                                            props.setAttributes({ textColor: value || '' });
+                                        },
+                                        label: __('Text color', 'dragon-zap-affiliate'),
+                                    },
+                                    {
+                                        value: attributes.accentColor,
+                                        onChange: function (value) {
+                                            props.setAttributes({ accentColor: value || '' });
+                                        },
+                                        label: __('Link & accent color', 'dragon-zap-affiliate'),
+                                    },
+                                    {
+                                        value: attributes.borderColor,
+                                        onChange: function (value) {
+                                            props.setAttributes({ borderColor: value || '' });
+                                        },
+                                        label: __('Border color', 'dragon-zap-affiliate'),
+                                    },
+                                ],
+                            })
+                            : [
+                                el(TextControl, {
+                                    key: 'backgroundColor',
+                                    label: __('Background color', 'dragon-zap-affiliate'),
+                                    placeholder: '#ffffff',
+                                    value: attributes.backgroundColor,
+                                    onChange: function (value) {
+                                        props.setAttributes({ backgroundColor: value });
+                                    },
+                                }),
+                                el(TextControl, {
+                                    key: 'textColor',
+                                    label: __('Text color', 'dragon-zap-affiliate'),
+                                    placeholder: '#0f172a',
+                                    value: attributes.textColor,
+                                    onChange: function (value) {
+                                        props.setAttributes({ textColor: value });
+                                    },
+                                }),
+                                el(TextControl, {
+                                    key: 'accentColor',
+                                    label: __('Link & accent color', 'dragon-zap-affiliate'),
+                                    placeholder: '#1d4ed8',
+                                    value: attributes.accentColor,
+                                    onChange: function (value) {
+                                        props.setAttributes({ accentColor: value });
+                                    },
+                                }),
+                                el(TextControl, {
+                                    key: 'borderColor',
+                                    label: __('Border color', 'dragon-zap-affiliate'),
+                                    placeholder: '#e2e8f0',
+                                    value: attributes.borderColor,
+                                    onChange: function (value) {
+                                        props.setAttributes({ borderColor: value });
+                                    },
+                                }),
+                            ],
                         el(TextControl, {
                             label: __('Additional CSS classes', 'dragon-zap-affiliate'),
                             value: attributes.customClass,

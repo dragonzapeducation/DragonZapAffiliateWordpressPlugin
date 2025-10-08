@@ -127,20 +127,20 @@ class Dragon_Zap_Affiliate_Related_Courses_Widget extends WP_Widget
         </p>
         <p>
             <label for="<?php echo esc_attr($this->get_field_id('background_color')); ?>"><?php esc_html_e('Background color:', 'dragon-zap-affiliate'); ?></label>
-            <input class="widefat" id="<?php echo esc_attr($this->get_field_id('background_color')); ?>" name="<?php echo esc_attr($this->get_field_name('background_color')); ?>" type="text" value="<?php echo esc_attr($background_color); ?>" placeholder="#ffffff" />
+            <input class="widefat dragon-zap-affiliate-color-field" id="<?php echo esc_attr($this->get_field_id('background_color')); ?>" name="<?php echo esc_attr($this->get_field_name('background_color')); ?>" type="text" value="<?php echo esc_attr($background_color); ?>" placeholder="#ffffff" data-default-color="#ffffff" />
             <span class="description"><?php esc_html_e('Leave blank to use the default widget background.', 'dragon-zap-affiliate'); ?></span>
         </p>
         <p>
             <label for="<?php echo esc_attr($this->get_field_id('text_color')); ?>"><?php esc_html_e('Text color:', 'dragon-zap-affiliate'); ?></label>
-            <input class="widefat" id="<?php echo esc_attr($this->get_field_id('text_color')); ?>" name="<?php echo esc_attr($this->get_field_name('text_color')); ?>" type="text" value="<?php echo esc_attr($text_color); ?>" placeholder="#0f172a" />
+            <input class="widefat dragon-zap-affiliate-color-field" id="<?php echo esc_attr($this->get_field_id('text_color')); ?>" name="<?php echo esc_attr($this->get_field_name('text_color')); ?>" type="text" value="<?php echo esc_attr($text_color); ?>" placeholder="#0f172a" data-default-color="#0f172a" />
         </p>
         <p>
             <label for="<?php echo esc_attr($this->get_field_id('accent_color')); ?>"><?php esc_html_e('Link & accent color:', 'dragon-zap-affiliate'); ?></label>
-            <input class="widefat" id="<?php echo esc_attr($this->get_field_id('accent_color')); ?>" name="<?php echo esc_attr($this->get_field_name('accent_color')); ?>" type="text" value="<?php echo esc_attr($accent_color); ?>" placeholder="#1d4ed8" />
+            <input class="widefat dragon-zap-affiliate-color-field" id="<?php echo esc_attr($this->get_field_id('accent_color')); ?>" name="<?php echo esc_attr($this->get_field_name('accent_color')); ?>" type="text" value="<?php echo esc_attr($accent_color); ?>" placeholder="#1d4ed8" data-default-color="#1d4ed8" />
         </p>
         <p>
             <label for="<?php echo esc_attr($this->get_field_id('border_color')); ?>"><?php esc_html_e('Border color:', 'dragon-zap-affiliate'); ?></label>
-            <input class="widefat" id="<?php echo esc_attr($this->get_field_id('border_color')); ?>" name="<?php echo esc_attr($this->get_field_name('border_color')); ?>" type="text" value="<?php echo esc_attr($border_color); ?>" placeholder="#e2e8f0" />
+            <input class="widefat dragon-zap-affiliate-color-field" id="<?php echo esc_attr($this->get_field_id('border_color')); ?>" name="<?php echo esc_attr($this->get_field_name('border_color')); ?>" type="text" value="<?php echo esc_attr($border_color); ?>" placeholder="#e2e8f0" data-default-color="#e2e8f0" />
         </p>
         <p>
             <label for="<?php echo esc_attr($this->get_field_id('custom_class')); ?>"><?php esc_html_e('Additional CSS classes:', 'dragon-zap-affiliate'); ?></label>
