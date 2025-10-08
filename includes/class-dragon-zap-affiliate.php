@@ -144,42 +144,52 @@ final class Dragon_Zap_Affiliate
 
     public function enqueue_assets(string $hook): void
     {
-        if ($this->settings_page_hook === null || $hook !== $this->settings_page_hook) {
-            return;
+        if ($this->settings_page_hook !== null && $hook === $this->settings_page_hook) {
+            wp_enqueue_style(
+                'dragon-zap-affiliate-admin',
+                $this->plugin_url('assets/css/admin.css'),
+                [],
+                $this->plugin_version()
+            );
+
+            wp_enqueue_script(
+                'dragon-zap-affiliate-admin',
+                $this->plugin_url('assets/js/admin.js'),
+                ['jquery'],
+                $this->plugin_version(),
+                true
+            );
+
+            wp_localize_script(
+                'dragon-zap-affiliate-admin',
+                'dragonZapAffiliate',
+                [
+                    'nonce' => wp_create_nonce(self::NONCE_ACTION),
+                    'buttonLabel' => __('Test Connection', 'dragon-zap-affiliate'),
+                    'testingText' => __('Testing...', 'dragon-zap-affiliate'),
+                    'testSuccessMessage' => __('Connection successful!', 'dragon-zap-affiliate'),
+                    'testErrorMessage' => __('Connection failed. Please check your API key and try again.', 'dragon-zap-affiliate'),
+                    'scopesTitle' => __('Authorized scopes', 'dragon-zap-affiliate'),
+                    'scopesEmpty' => __('No scopes were returned for this API key.', 'dragon-zap-affiliate'),
+                    'restrictionsTitle' => __('Restricted scopes', 'dragon-zap-affiliate'),
+                    'restrictionsEmpty' => __('No restricted scopes were reported for this API key.', 'dragon-zap-affiliate'),
+                    'restrictionsHelp' => __('Restricted scopes require additional approval. Contact Dragon Zap support to request access.', 'dragon-zap-affiliate'),
+                    'endpointTitle' => __('Affiliate test endpoint', 'dragon-zap-affiliate'),
+                ]
+            );
         }
 
-        wp_enqueue_style(
-            'dragon-zap-affiliate-admin',
-            $this->plugin_url('assets/css/admin.css'),
-            [],
-            $this->plugin_version()
-        );
+        if ($hook === 'widgets.php' || $hook === 'customize.php') {
+            wp_enqueue_style('wp-color-picker');
 
-        wp_enqueue_script(
-            'dragon-zap-affiliate-admin',
-            $this->plugin_url('assets/js/admin.js'),
-            ['jquery'],
-            $this->plugin_version(),
-            true
-        );
-
-        wp_localize_script(
-            'dragon-zap-affiliate-admin',
-            'dragonZapAffiliate',
-            [
-                'nonce' => wp_create_nonce(self::NONCE_ACTION),
-                'buttonLabel' => __('Test Connection', 'dragon-zap-affiliate'),
-                'testingText' => __('Testing...', 'dragon-zap-affiliate'),
-                'testSuccessMessage' => __('Connection successful!', 'dragon-zap-affiliate'),
-                'testErrorMessage' => __('Connection failed. Please check your API key and try again.', 'dragon-zap-affiliate'),
-                'scopesTitle' => __('Authorized scopes', 'dragon-zap-affiliate'),
-                'scopesEmpty' => __('No scopes were returned for this API key.', 'dragon-zap-affiliate'),
-                'restrictionsTitle' => __('Restricted scopes', 'dragon-zap-affiliate'),
-                'restrictionsEmpty' => __('No restricted scopes were reported for this API key.', 'dragon-zap-affiliate'),
-                'restrictionsHelp' => __('Restricted scopes require additional approval. Contact Dragon Zap support to request access.', 'dragon-zap-affiliate'),
-                'endpointTitle' => __('Affiliate test endpoint', 'dragon-zap-affiliate'),
-            ]
-        );
+            wp_enqueue_script(
+                'dragon-zap-affiliate-widget-controls',
+                $this->plugin_url('assets/js/widget-related-courses-controls.js'),
+                ['jquery', 'wp-color-picker'],
+                $this->plugin_version(),
+                true
+            );
+        }
     }
 
     public function render_settings_page(): void
