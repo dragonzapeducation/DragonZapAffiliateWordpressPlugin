@@ -420,6 +420,7 @@ final class Dragon_Zap_Affiliate
         $post_id = absint(get_the_ID());
 
         if ($post_id <= 0) {
+            
             return $content;
         }
 
@@ -429,6 +430,7 @@ final class Dragon_Zap_Affiliate
         ]);
 
         if ($markup === '') {
+            
             return $content;
         }
 
@@ -462,7 +464,7 @@ final class Dragon_Zap_Affiliate
             return [];
         }
 
-        $cache_key = $this->get_related_courses_transient_key($post_id);
+        $cache_key = $this->get_related_courses_transient_key($post_id);;
         $cached = get_transient($cache_key);
 
         if (is_array($cached)) {
@@ -476,13 +478,6 @@ final class Dragon_Zap_Affiliate
         }
 
         $search_terms = $this->build_post_search_terms($post);
-
-        if ($search_terms === '') {
-            set_transient($cache_key, [], HOUR_IN_SECONDS);
-
-            return [];
-        }
-
         $client = $this->create_api_client();
 
         if ($client === null) {
@@ -501,6 +496,22 @@ final class Dragon_Zap_Affiliate
             return [];
         }
 
+        // if the array is empty we will bring back without search terms.
+        if (empty($response['data']['products']))
+        {
+            $search_terms = '';
+            try {
+                $response = $client->products()->list([
+                    'per_page' => 3,
+                    'search' => $search_terms,
+                    'type' => 'App\\Models\\Course',
+                ]);
+            } catch (\DragonZap\AffiliateApi\Exceptions\ApiException $exception) {
+                return [];
+            } catch (\Throwable $exception) {
+                return [];
+            }
+        }
         $products = [];
 
         if (is_array($response) && isset($response['data']['products']) && is_array($response['data']['products'])) {
