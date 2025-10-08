@@ -11,6 +11,10 @@ final class Dragon_Zap_Affiliate
     private const NONCE_ACTION = 'dragon_zap_affiliate_test';
     private const OPTION_AUTO_APPEND = 'dragon_zap_affiliate_auto_append';
     private const DEFAULT_API_BASE_URI = 'https://affiliate.dragonzap.com/api/v1';
+    private const META_BLOG_ID = '_dragon_zap_affiliate_blog_id';
+    private const META_BLOG_PROFILE_ID = '_dragon_zap_affiliate_blog_profile_id';
+    private const META_CATEGORY_SLUG = '_dragon_zap_affiliate_blog_category_slug';
+    private const TRANSIENT_CAN_MANAGE_BLOGS = 'dragon_zap_affiliate_can_manage_blogs';
 
     /**
      * @var self|null
@@ -43,9 +47,13 @@ final class Dragon_Zap_Affiliate
         add_action('init', [$this, 'register_frontend_assets']);
         add_action('init', [$this, 'register_blocks']);
         add_action('widgets_init', [$this, 'register_widgets']);
-      
+
         add_action('save_post', [$this, 'clear_related_courses_cache']);
+        add_action('save_post', [$this, 'handle_blog_submission'], 20, 2);
         add_action('delete_post', [$this, 'clear_related_courses_cache']);
+
+        add_action('add_meta_boxes', [$this, 'register_blog_meta_box']);
+        add_action('admin_notices', [$this, 'render_blog_admin_notice']);
         
         $this->ensure_sdk_autoload();
 
@@ -192,6 +200,97 @@ final class Dragon_Zap_Affiliate
         }
     }
 
+    public function register_blog_meta_box(): void
+    {
+        if (! current_user_can('edit_posts')) {
+            return;
+        }
+
+        add_meta_box(
+            'dragon-zap-affiliate-blog',
+            __('Dragon Zap Blog', 'dragon-zap-affiliate'),
+            [$this, 'render_blog_meta_box'],
+            'post',
+            'side',
+            'high'
+        );
+    }
+
+    public function render_blog_meta_box(\WP_Post $post): void
+    {
+        wp_nonce_field('dragon_zap_affiliate_blog_meta', 'dragon_zap_affiliate_blog_nonce');
+
+        $blog_id = get_post_meta($post->ID, self::META_BLOG_ID, true);
+        $blog_profile_id = get_post_meta($post->ID, self::META_BLOG_PROFILE_ID, true);
+        $category_slug = get_post_meta($post->ID, self::META_CATEGORY_SLUG, true);
+
+        if (! is_string($blog_profile_id)) {
+            $blog_profile_id = '';
+        }
+
+        if (! is_string($category_slug)) {
+            $category_slug = '';
+        }
+
+        $can_manage_blogs = $this->can_manage_blogs();
+
+        if ($blog_id !== '') {
+            echo '<p class="description">' . sprintf(
+                /* translators: %s: Dragon Zap blog identifier. */
+                esc_html__('Linked Dragon Zap blog ID: %s', 'dragon-zap-affiliate'),
+                esc_html($blog_id)
+            ) . '</p>';
+        }
+
+        if (! $can_manage_blogs) {
+            echo '<p class="description"><strong>' . esc_html__(
+                'Your API key is missing the blogs.manage scope or it is restricted. Update your credentials to publish blogs.',
+                'dragon-zap-affiliate'
+            ) . '</strong></p>';
+        }
+
+        ?>
+        <p>
+            <label for="dragon-zap-affiliate-blog-profile-id">
+                <?php esc_html_e('Blog profile ID', 'dragon-zap-affiliate'); ?>
+            </label>
+            <input
+                type="number"
+                class="widefat"
+                id="dragon-zap-affiliate-blog-profile-id"
+                name="dragon_zap_affiliate_blog_profile_id"
+                min="1"
+                step="1"
+                value="<?php echo esc_attr($blog_profile_id); ?>"
+            />
+        </p>
+        <p class="description">
+            <?php esc_html_e('Choose the Dragon Zap profile that should own the blog post.', 'dragon-zap-affiliate'); ?>
+        </p>
+        <p>
+            <label for="dragon-zap-affiliate-blog-category-slug">
+                <?php esc_html_e('Category slug', 'dragon-zap-affiliate'); ?>
+            </label>
+            <input
+                type="text"
+                class="widefat"
+                id="dragon-zap-affiliate-blog-category-slug"
+                name="dragon_zap_affiliate_blog_category_slug"
+                value="<?php echo esc_attr($category_slug); ?>"
+            />
+        </p>
+        <p class="description">
+            <?php esc_html_e('Provide the Dragon Zap blog category slug (for example: low-level-programming).', 'dragon-zap-affiliate'); ?>
+        </p>
+        <p>
+            <label>
+                <input type="checkbox" name="dragon_zap_affiliate_publish_blog" value="1" <?php disabled(! $can_manage_blogs); ?> />
+                <?php esc_html_e('Send or update this post on Dragon Zap when updating.', 'dragon-zap-affiliate'); ?>
+            </label>
+        </p>
+        <?php
+    }
+
     public function render_settings_page(): void
     {
         if (! current_user_can('manage_options')) {
@@ -264,6 +363,8 @@ final class Dragon_Zap_Affiliate
      */
     public function sanitize_api_key($value): string
     {
+        $this->reset_blog_scope_cache();
+
         if (! is_string($value)) {
             return '';
         }
@@ -540,6 +641,118 @@ final class Dragon_Zap_Affiliate
         }
 
         return $content . $markup;
+    }
+
+    public function handle_blog_submission(int $post_id, \WP_Post $post): void
+    {
+        if ($post_id <= 0 || $post->post_type !== 'post') {
+            return;
+        }
+
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+
+        if (function_exists('wp_is_post_revision') && wp_is_post_revision($post_id)) {
+            return;
+        }
+
+        if (! current_user_can('edit_post', $post_id)) {
+            return;
+        }
+
+        if (! isset($_POST['dragon_zap_affiliate_blog_nonce']) || ! wp_verify_nonce(
+            sanitize_text_field(wp_unslash($_POST['dragon_zap_affiliate_blog_nonce'] ?? '')),
+            'dragon_zap_affiliate_blog_meta'
+        )) {
+            return;
+        }
+
+        $profile_id_input = isset($_POST['dragon_zap_affiliate_blog_profile_id'])
+            ? wp_unslash($_POST['dragon_zap_affiliate_blog_profile_id'])
+            : '';
+        $blog_profile_id = is_numeric($profile_id_input) ? absint($profile_id_input) : 0;
+
+        $category_slug_input = isset($_POST['dragon_zap_affiliate_blog_category_slug'])
+            ? wp_unslash($_POST['dragon_zap_affiliate_blog_category_slug'])
+            : '';
+        $category_slug = is_string($category_slug_input) ? sanitize_title($category_slug_input) : '';
+
+        if ($blog_profile_id > 0) {
+            update_post_meta($post_id, self::META_BLOG_PROFILE_ID, (string) $blog_profile_id);
+        } else {
+            delete_post_meta($post_id, self::META_BLOG_PROFILE_ID);
+        }
+
+        if ($category_slug !== '') {
+            update_post_meta($post_id, self::META_CATEGORY_SLUG, $category_slug);
+        } else {
+            delete_post_meta($post_id, self::META_CATEGORY_SLUG);
+        }
+
+        $should_publish = isset($_POST['dragon_zap_affiliate_publish_blog']) && $_POST['dragon_zap_affiliate_publish_blog'] === '1';
+
+        if (! $should_publish) {
+            return;
+        }
+
+        $result = $this->sync_post_to_blog($post, $blog_profile_id, $category_slug);
+
+        if (is_wp_error($result)) {
+            $message = $result->get_error_message();
+            add_filter(
+                'redirect_post_location',
+                static function (string $location) use ($message): string {
+                    return add_query_arg(
+                        [
+                            'dragon_zap_affiliate_blog_notice' => 'error',
+                            'dragon_zap_affiliate_blog_message' => $message,
+                        ],
+                        $location
+                    );
+                }
+            );
+
+            return;
+        }
+
+        $blog_id = $result['blog_id'];
+        update_post_meta($post_id, self::META_BLOG_ID, (string) $blog_id);
+
+        add_filter(
+            'redirect_post_location',
+            static function (string $location) use ($result): string {
+                return add_query_arg(
+                    [
+                        'dragon_zap_affiliate_blog_notice' => 'success',
+                        'dragon_zap_affiliate_blog_message' => $result['message'],
+                    ],
+                    $location
+                );
+            }
+        );
+    }
+
+    public function render_blog_admin_notice(): void
+    {
+        if (! is_admin() || ! isset($_GET['dragon_zap_affiliate_blog_notice'], $_GET['dragon_zap_affiliate_blog_message'])) {
+            return;
+        }
+
+        $notice_type = sanitize_key(wp_unslash($_GET['dragon_zap_affiliate_blog_notice']));
+        $message = sanitize_text_field(wp_unslash($_GET['dragon_zap_affiliate_blog_message']));
+
+        if ($message === '') {
+            return;
+        }
+
+        $class = $notice_type === 'success' ? 'notice-success' : 'notice-error';
+
+        printf(
+            '<div class="notice %1$s"><p>%2$s</p></div>',
+            esc_attr($class),
+            esc_html($message)
+        );
     }
 
     public function clear_related_courses_cache(int $post_id): void
@@ -848,6 +1061,153 @@ final class Dragon_Zap_Affiliate
         return new \DragonZap\AffiliateApi\Client($api_key, $this->get_api_base_uri());
     }
 
+    /**
+     * @return array{blog_id:int,message:string}|\WP_Error
+     */
+    private function sync_post_to_blog(\WP_Post $post, int $blog_profile_id, string $category_slug)
+    {
+        if ($blog_profile_id <= 0) {
+            return new \WP_Error(
+                'dragon_zap_affiliate_missing_profile',
+                __('Enter a valid Dragon Zap blog profile ID before publishing.', 'dragon-zap-affiliate')
+            );
+        }
+
+        if ($category_slug === '') {
+            return new \WP_Error(
+                'dragon_zap_affiliate_missing_category',
+                __('Enter the Dragon Zap blog category slug before publishing.', 'dragon-zap-affiliate')
+            );
+        }
+
+        $client = $this->create_api_client();
+
+        if ($client === null) {
+            return new \WP_Error(
+                'dragon_zap_affiliate_missing_key',
+                __('Add your Dragon Zap Affiliate API key in the plugin settings before publishing.', 'dragon-zap-affiliate')
+            );
+        }
+
+        if (! $this->can_manage_blogs()) {
+            return new \WP_Error(
+                'dragon_zap_affiliate_missing_scope',
+                __('Your API key cannot manage blogs. Request the blogs.manage scope from Dragon Zap support.', 'dragon-zap-affiliate')
+            );
+        }
+
+        $existing_blog_id = get_post_meta($post->ID, self::META_BLOG_ID, true);
+        $existing_blog_id = is_string($existing_blog_id) ? absint($existing_blog_id) : 0;
+
+        $previous_global_post = $GLOBALS['post'] ?? null;
+        $GLOBALS['post'] = $post;
+        $content = apply_filters('the_content', $post->post_content);
+
+        if ($previous_global_post instanceof \WP_Post) {
+            $GLOBALS['post'] = $previous_global_post;
+        } else {
+            unset($GLOBALS['post']);
+        }
+
+        if (! is_string($content) || $content === '') {
+            $content = wpautop($post->post_content);
+        }
+
+        $content = wp_kses_post($content);
+
+        $payload = [
+            'title' => wp_strip_all_tags($post->post_title),
+            'content' => $content,
+            'category_slug' => $category_slug,
+            'blog_profile_id' => $blog_profile_id,
+        ];
+
+        try {
+            if ($existing_blog_id > 0) {
+                $response = $client->blogs()->update((string) $existing_blog_id, $payload);
+            } else {
+                $response = $client->blogs()->create($payload);
+            }
+        } catch (\DragonZap\AffiliateApi\Exceptions\ApiException $exception) {
+            return new \WP_Error('dragon_zap_affiliate_api_error', $exception->getMessage());
+        } catch (\Throwable $exception) {
+            return new \WP_Error('dragon_zap_affiliate_unexpected_error', $exception->getMessage());
+        }
+
+        $blog_data = $response['data']['blog'] ?? [];
+        $blog_id = is_array($blog_data) && isset($blog_data['id']) ? absint($blog_data['id']) : 0;
+
+        if ($existing_blog_id > 0 && $blog_id === 0) {
+            $blog_id = $existing_blog_id;
+        }
+
+        if ($blog_id <= 0) {
+            return new \WP_Error(
+                'dragon_zap_affiliate_invalid_response',
+                __('Dragon Zap did not return a blog identifier. Please try again.', 'dragon-zap-affiliate')
+            );
+        }
+
+        $message = $existing_blog_id > 0
+            ? __('Dragon Zap blog updated successfully.', 'dragon-zap-affiliate')
+            : __('Dragon Zap blog draft created successfully.', 'dragon-zap-affiliate');
+
+        return [
+            'blog_id' => $blog_id,
+            'message' => $message,
+        ];
+    }
+
+    private function can_manage_blogs(): bool
+    {
+        $cached = get_transient(self::TRANSIENT_CAN_MANAGE_BLOGS);
+
+        if ($cached === '1') {
+            return true;
+        }
+
+        if ($cached === '0') {
+            return false;
+        }
+
+        $client = $this->create_api_client();
+
+        if ($client === null) {
+            set_transient(self::TRANSIENT_CAN_MANAGE_BLOGS, '0', 5 * MINUTE_IN_SECONDS);
+
+            return false;
+        }
+
+        try {
+            $response = $client->testConnection();
+        } catch (\DragonZap\AffiliateApi\Exceptions\ApiException $exception) {
+            set_transient(self::TRANSIENT_CAN_MANAGE_BLOGS, '0', 5 * MINUTE_IN_SECONDS);
+
+            return false;
+        } catch (\Throwable $exception) {
+            set_transient(self::TRANSIENT_CAN_MANAGE_BLOGS, '0', 5 * MINUTE_IN_SECONDS);
+
+            return false;
+        }
+
+        $scopes = $response['data']['scopes'] ?? [];
+        $restrictions = $response['data']['restrictions'] ?? [];
+
+        $scopes = is_array($scopes) ? $scopes : [];
+        $restrictions = is_array($restrictions) ? $restrictions : [];
+
+        $allowed = in_array('blogs.manage', $scopes, true) && ! in_array('blogs.manage', $restrictions, true);
+
+        set_transient(self::TRANSIENT_CAN_MANAGE_BLOGS, $allowed ? '1' : '0', 5 * MINUTE_IN_SECONDS);
+
+        return $allowed;
+    }
+
+    private function reset_blog_scope_cache(): void
+    {
+        delete_transient(self::TRANSIENT_CAN_MANAGE_BLOGS);
+    }
+
     private function build_post_search_terms(\WP_Post $post): string
     {
         $terms = [];
@@ -940,7 +1300,13 @@ final class Dragon_Zap_Affiliate
             return '';
         }
 
-        return $this->sanitize_api_key($value);
+        $value = trim($value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        return sanitize_text_field($value);
     }
 
     private function get_api_base_uri(): string
@@ -951,13 +1317,19 @@ final class Dragon_Zap_Affiliate
             return self::DEFAULT_API_BASE_URI;
         }
 
-        $value = $this->sanitize_api_base_uri($value);
+        $value = trim($value);
 
         if ($value === '') {
             return self::DEFAULT_API_BASE_URI;
         }
 
-        return $value;
+        $value = esc_url_raw($value);
+
+        if (! is_string($value) || $value === '') {
+            return self::DEFAULT_API_BASE_URI;
+        }
+
+        return untrailingslashit($value);
     }
 
     /**
@@ -965,6 +1337,8 @@ final class Dragon_Zap_Affiliate
      */
     public function sanitize_api_base_uri($value): string
     {
+        $this->reset_blog_scope_cache();
+
         if (! is_string($value)) {
             return self::DEFAULT_API_BASE_URI;
         }
