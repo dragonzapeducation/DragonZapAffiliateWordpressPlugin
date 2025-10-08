@@ -40,6 +40,12 @@
             return null;
         };
 
+    var useBlockProps = blockEditor && typeof blockEditor.useBlockProps === 'function'
+        ? blockEditor.useBlockProps
+        : function () {
+            return {};
+        };
+
     blocks.registerBlockType('dragon-zap-affiliate/related-courses', {
         title: __('Dragon Zap Related Courses', 'dragon-zap-affiliate'),
         description: __('Display Dragon Zap courses that are related to the current post.', 'dragon-zap-affiliate'),
@@ -92,6 +98,20 @@
         },
         edit: function (props) {
             var attributes = props.attributes;
+            var blockProps = useBlockProps();
+
+            if (!blockProps.className && props.className) {
+                blockProps.className = props.className;
+            }
+
+            var previewProps = Object.assign({ key: 'preview' }, blockProps);
+            var previewClass = 'dragon-zap-affiliate-related-courses-block-preview';
+
+            if (previewProps.className) {
+                previewProps.className += ' ' + previewClass;
+            } else {
+                previewProps.className = previewClass;
+            }
 
             return [
                 el(InspectorControls, { key: 'controls' },
@@ -174,7 +194,7 @@
                         })
                     )
                 ),
-                el('div', { className: 'dragon-zap-affiliate-related-courses-block-preview', key: 'preview' },
+                el('div', previewProps,
                     el('p', {}, __('Related courses will be shown on single posts after the content or wherever you place this block.', 'dragon-zap-affiliate'))
                 )
             ];
