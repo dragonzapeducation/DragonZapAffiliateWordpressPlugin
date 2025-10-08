@@ -13,19 +13,24 @@ class Dragon_Zap_Affiliate_Related_Courses_Widget extends WP_Widget
             __('Dragon Zap Related Courses', 'dragon-zap-affiliate'),
             [
                 'description' => __('Displays related Dragon Zap courses for the current post.', 'dragon-zap-affiliate'),
+                'show_instance_in_rest' => true,
+                'customize_selective_refresh' => true,
             ]
         );
     }
 
     public function widget($args, $instance)
     {
-        if (! is_singular('post')) {
+        $is_admin_context = is_admin();
+        $post_id = 0;
+
+        if (is_singular('post')) {
+            $post_id = absint(get_the_ID());
+        } elseif (! $is_admin_context) {
             return;
         }
 
-        $post_id = absint(get_the_ID());
-
-        if ($post_id <= 0) {
+        if ($post_id <= 0 && ! $is_admin_context) {
             return;
         }
 
@@ -38,12 +43,25 @@ class Dragon_Zap_Affiliate_Related_Courses_Widget extends WP_Widget
         $title = isset($instance['title']) ? (string) $instance['title'] : __('Recommended Courses', 'dragon-zap-affiliate');
         $title = apply_filters('widget_title', $title, $instance, $this->id_base);
 
-        $markup = $plugin->get_related_courses_markup($post_id, [
-            'title' => '',
-            'context' => 'widget',
-        ]);
+        $markup = '';
+
+        if ($post_id > 0) {
+            $markup = $plugin->get_related_courses_markup($post_id, [
+                'title' => '',
+                'context' => 'widget',
+            ]);
+        }
 
         if ($markup === '') {
+            if ($is_admin_context) {
+                echo isset($args['before_widget']) ? $args['before_widget'] : '';
+                echo '<p class="dragon-zap-affiliate-widget-notice">' . esc_html__(
+                    'Related courses will appear on single posts once your Dragon Zap Affiliate API key is configured and results are available.',
+                    'dragon-zap-affiliate'
+                ) . '</p>';
+                echo isset($args['after_widget']) ? $args['after_widget'] : '';
+            }
+
             return;
         }
 
