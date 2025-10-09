@@ -16,6 +16,7 @@ final class Dragon_Zap_Affiliate
     private const META_BLOG_PROFILE_ID = '_dragon_zap_affiliate_blog_profile_id';
     private const META_BLOG_CATEGORY = '_dragon_zap_affiliate_blog_category_slug';
     private const NOTICE_TRANSIENT_PREFIX = 'dragon_zap_affiliate_notice_';
+    private const META_BLOG_FINAL_PROMPT_SHOWN = '_dragon_zap_affiliate_blog_prompt_shown';
     private const BLOG_PROFILE_CREATE_SENTINEL = '__dragon_zap_affiliate_create_profile';
 
     /**
@@ -72,6 +73,7 @@ final class Dragon_Zap_Affiliate
         add_action('add_meta_boxes', [$this, 'register_post_meta_box']);
         add_action('save_post', [$this, 'handle_blog_submission'], 20, 3);
         add_action('admin_notices', [$this, 'render_admin_notices']);
+        add_action('admin_footer-post.php', [$this, 'maybe_highlight_blog_meta_box']);
         
         $this->ensure_sdk_autoload();
 
@@ -800,7 +802,16 @@ final class Dragon_Zap_Affiliate
                 break;
         }
 
-        echo '<div class="notice ' . esc_attr($class) . '"><p>' . esc_html((string) $notice['message']) . '</p></div>';
+        $message = isset($notice['message']) ? $notice['message'] : '';
+
+        if (! is_string($message) || $message === '') {
+            return;
+        }
+
+        $allow_html = ! empty($notice['allow_html']);
+        $content = $allow_html ? wp_kses_post($message) : esc_html($message);
+
+        echo '<div class="notice ' . esc_attr($class) . '"><p>' . $content . '</p></div>';
     }
 
     /**
@@ -954,9 +965,11 @@ final class Dragon_Zap_Affiliate
 
         $enabled_raw = isset($_POST['dragon_zap_affiliate_blog_enabled']) ? wp_unslash($_POST['dragon_zap_affiliate_blog_enabled']) : '';
         $enabled = $this->sanitize_checkbox_value($enabled_raw);
+        $was_enabled = get_post_meta($post_id, self::META_BLOG_ENABLED, true) === '1';
 
         if ($enabled) {
             update_post_meta($post_id, self::META_BLOG_ENABLED, '1');
+            delete_post_meta($post_id, self::META_BLOG_FINAL_PROMPT_SHOWN);
         } else {
             delete_post_meta($post_id, self::META_BLOG_ENABLED);
         }
@@ -980,6 +993,10 @@ final class Dragon_Zap_Affiliate
         }
 
         if (! $enabled) {
+            if (! $was_enabled && $post->post_status === 'publish' && ! $this->has_final_prompt_been_shown($post_id)) {
+                $this->add_blog_final_prompt_notice($post_id);
+            }
+
             return;
         }
 
@@ -1607,7 +1624,110 @@ final class Dragon_Zap_Affiliate
         set_transient($key, [
             'type' => $type,
             'message' => $message,
+            'allow_html' => false,
         ], 5 * MINUTE_IN_SECONDS);
+    }
+
+    private function add_admin_notice_with_html(string $type, string $message): void
+    {
+        $key = $this->get_admin_notice_transient_key();
+
+        if ($key === '') {
+            return;
+        }
+
+        set_transient($key, [
+            'type' => $type,
+            'message' => $message,
+            'allow_html' => true,
+        ], 5 * MINUTE_IN_SECONDS);
+    }
+
+    private function add_blog_final_prompt_notice(int $post_id): void
+    {
+        $edit_link = get_edit_post_link($post_id, 'raw');
+
+        if ($edit_link === false) {
+            return;
+        }
+
+        $edit_link = add_query_arg('dza_focus_blog_meta', '1', $edit_link) . '#dragon-zap-affiliate-blog';
+        $title = get_the_title($post_id);
+
+        if (! is_string($title) || $title === '') {
+            $title = __('this post', 'dragon-zap-affiliate');
+        }
+
+        $title = wp_strip_all_tags($title);
+
+        $message = sprintf(
+            /* translators: %1$s: Post title, %2$s: URL to edit post */
+            __(
+                'You just published “%1$s” without sending it to Dragon Zap. <a href="%2$s" class="button button-primary">Review Dragon Zap options</a>',
+                'dragon-zap-affiliate'
+            ),
+            $title,
+            esc_url($edit_link)
+        );
+
+        $this->add_admin_notice_with_html('warning', $message);
+        update_post_meta($post_id, self::META_BLOG_FINAL_PROMPT_SHOWN, '1');
+    }
+
+    private function has_final_prompt_been_shown(int $post_id): bool
+    {
+        return get_post_meta($post_id, self::META_BLOG_FINAL_PROMPT_SHOWN, true) === '1';
+    }
+
+    public function maybe_highlight_blog_meta_box(): void
+    {
+        if (! isset($_GET['dza_focus_blog_meta'])) {
+            return;
+        }
+
+        $focus_raw = wp_unslash($_GET['dza_focus_blog_meta']);
+
+        if ($focus_raw !== '1') {
+            return;
+        }
+
+        $post_id = isset($_GET['post']) ? absint(wp_unslash($_GET['post'])) : 0;
+
+        if ($post_id <= 0 || ! current_user_can('edit_post', $post_id)) {
+            return;
+        }
+
+        ?>
+        <style>
+            #dragon-zap-affiliate-blog.dragon-zap-affiliate-highlight {
+                box-shadow: 0 0 0 2px #0073aa;
+                transition: box-shadow 0.3s ease;
+            }
+        </style>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var metaBox = document.getElementById('dragon-zap-affiliate-blog');
+
+                if (!metaBox) {
+                    return;
+                }
+
+                metaBox.classList.add('dragon-zap-affiliate-highlight');
+
+                if (typeof metaBox.scrollIntoView === 'function') {
+                    try {
+                        metaBox.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    } catch (error) {
+                        metaBox.scrollIntoView();
+                    }
+                }
+
+                window.setTimeout(function () {
+                    metaBox.classList.remove('dragon-zap-affiliate-highlight');
+                }, 4000);
+            });
+        </script>
+        <?php
     }
 
     private function get_admin_notice_transient_key(): string
