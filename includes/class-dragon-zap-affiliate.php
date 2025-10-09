@@ -93,7 +93,7 @@ final class Dragon_Zap_Affiliate
             'dragon_zap_affiliate_general',
             __('API Settings', 'dragon-zap-affiliate'),
             static function (): void {
-                echo '<p>' . esc_html__('Enter your Dragon Zap Affiliate API credentials.', 'dragon-zap-affiliate') . '</p>';
+                echo '<p>' . esc_html__('Enter your Dragon Zap Affiliate API credentials.', 'dragon-zap-affiliate') . '</p>             <p>You can generate your API key on your affilaite account here: <a href="https://dragonzap.com/user/affiliate">https://dragonzap.com/user/affiliate</a></p>';
             },
             'dragon_zap_affiliate'
         );
@@ -210,7 +210,6 @@ final class Dragon_Zap_Affiliate
                 submit_button();
                 ?>
             </form>
-
             <p>
                 <button type="button" class="button button-secondary" id="dragon-zap-affiliate-test">
                     <?php esc_html_e('Test Connection', 'dragon-zap-affiliate'); ?>
