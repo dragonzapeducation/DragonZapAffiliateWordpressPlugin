@@ -7,6 +7,13 @@ WordPress plugin that integrates with the Dragon Zap Affiliate API.
 * Store and validate your Dragon Zap Affiliate API credentials from the WordPress admin settings page.
 * Optionally append a "Recommended Courses" widget to single blog posts using the Dragon Zap Affiliate product search.
 * Register both a classic widget and a block editor widget so the related courses list can be repositioned or removed entirely.
+* Send WordPress posts to the Dragon Zap affiliate blog review queue when your API key includes the `blogs.manage` scope.
+
+## Blog Publishing
+
+When you edit a WordPress post you will see a **Post to Dragon Zap** meta box. Tick the checkbox to send the post content to Dragon Zap as a draft blog entry. You can choose the Dragon Zap blog profile and category before saving; if the API can return available profiles or categories they will be shown in drop-down lists, otherwise you can enter the IDs manually.
+
+Blog publishing requires the `blogs.manage` scope on your API key. If the scope is missing or restricted the meta box explains why the option is unavailable so you can request access from Dragon Zap support.
 
 ## Related Courses Widget
 

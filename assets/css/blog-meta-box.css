@@ -1,0 +1,62 @@
+.dragon-zap-affiliate-blog-meta__notice {
+    margin-bottom: 12px;
+}
+
+.dragon-zap-affiliate-blog-meta__notice.notice {
+    padding: 10px 12px;
+}
+
+.dragon-zap-affiliate-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100000;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.dragon-zap-affiliate-modal {
+    background: #fff;
+    max-width: 420px;
+    width: 100%;
+    border-radius: 6px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+    padding: 24px;
+    box-sizing: border-box;
+}
+
+.dragon-zap-affiliate-modal__title {
+    margin: 0 0 18px;
+    font-size: 18px;
+}
+
+.dragon-zap-affiliate-modal__field {
+    margin-bottom: 16px;
+}
+
+.dragon-zap-affiliate-modal__field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.dragon-zap-affiliate-modal__field input {
+    width: 100%;
+    padding: 6px 8px;
+    box-sizing: border-box;
+}
+
+.dragon-zap-affiliate-modal__error {
+    color: #b32d2e;
+    margin: 0 0 16px;
+}
+
+.dragon-zap-affiliate-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
