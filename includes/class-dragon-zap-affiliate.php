@@ -18,6 +18,8 @@ final class Dragon_Zap_Affiliate
     private const NOTICE_TRANSIENT_PREFIX = 'dragon_zap_affiliate_notice_';
     private const META_BLOG_FINAL_PROMPT_SHOWN = '_dragon_zap_affiliate_blog_prompt_shown';
     private const BLOG_PROFILE_CREATE_SENTINEL = '__dragon_zap_affiliate_create_profile';
+    private const COURSE_TRANSIENT_PREFIX = 'dragon_zap_affiliate_course_';
+    private const NONCE_SINGLE_COURSE = 'dragon_zap_affiliate_single_course';
 
     /**
      * @var self|null
@@ -63,6 +65,7 @@ final class Dragon_Zap_Affiliate
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
         add_action('wp_ajax_dza_test_connection', [$this, 'handle_test_request']);
         add_action('wp_ajax_dza_create_blog_profile', [$this, 'handle_create_blog_profile_request']);
+        add_action('wp_ajax_dza_search_courses', [$this, 'handle_search_courses_request']);
         add_action('init', [$this, 'register_frontend_assets']);
         add_action('init', [$this, 'register_blocks']);
         add_action('widgets_init', [$this, 'register_widgets']);
@@ -262,6 +265,38 @@ final class Dragon_Zap_Affiliate
                 $this->plugin_version(),
                 true
             );
+
+            wp_enqueue_style(
+                'dragon-zap-affiliate-single-course-widget',
+                $this->plugin_url('assets/css/widget-single-course.css'),
+                [],
+                $this->plugin_version()
+            );
+
+            wp_enqueue_script(
+                'dragon-zap-affiliate-single-course-widget',
+                $this->plugin_url('assets/js/widget-single-course.js'),
+                ['jquery'],
+                $this->plugin_version(),
+                true
+            );
+
+            wp_localize_script(
+                'dragon-zap-affiliate-single-course-widget',
+                'dragonZapAffiliateSingleCourse',
+                [
+                    'ajaxUrl' => admin_url('admin-ajax.php'),
+                    'nonce' => wp_create_nonce(self::NONCE_SINGLE_COURSE),
+                    'strings' => [
+                        'searching' => __('Searching...', 'dragon-zap-affiliate'),
+                        'noResults' => __('No courses found. Try another search term.', 'dragon-zap-affiliate'),
+                        'error' => __('Something went wrong. Please try again.', 'dragon-zap-affiliate'),
+                        'remove' => __('Remove selection', 'dragon-zap-affiliate'),
+                        'emptySelected' => __('No course selected yet. Use the search above to choose one.', 'dragon-zap-affiliate'),
+                        'viewCourse' => __('View course', 'dragon-zap-affiliate'),
+                    ],
+                ]
+            );
         }
     }
 
@@ -452,6 +487,74 @@ final class Dragon_Zap_Affiliate
         ]);
     }
 
+    public function handle_search_courses_request(): void
+    {
+        if (! current_user_can('edit_theme_options')) {
+            wp_send_json_error(['message' => esc_html__('Unauthorized request.', 'dragon-zap-affiliate')], 403);
+        }
+
+        check_ajax_referer(self::NONCE_SINGLE_COURSE, 'nonce');
+
+        $search = isset($_POST['search']) ? sanitize_text_field(wp_unslash((string) $_POST['search'])) : '';
+        $course_id = isset($_POST['course_id']) ? absint($_POST['course_id']) : 0;
+
+        if ($course_id > 0) {
+            $course = $this->get_course_by_id($course_id);
+
+            if ($course === null) {
+                wp_send_json_error(['message' => esc_html__('Course not found.', 'dragon-zap-affiliate')], 404);
+            }
+
+            wp_send_json_success(['courses' => [$course]]);
+        }
+
+        if ($search === '' || strlen($search) < 2) {
+            wp_send_json_success(['courses' => []]);
+        }
+
+        $client = $this->create_api_client();
+
+        if ($client === null) {
+            wp_send_json_error(['message' => esc_html__('A Dragon Zap API key is required before courses can be searched.', 'dragon-zap-affiliate')], 400);
+        }
+
+        try {
+            $response = $client->products()->list([
+                'per_page' => 10,
+                'search' => $search,
+                'type' => 'App\\Models\\Course',
+            ]);
+        } catch (\DragonZap\AffiliateApi\Exceptions\ApiException $exception) {
+            wp_send_json_error(['message' => $exception->getMessage()], 400);
+        } catch (\Throwable $exception) {
+            wp_send_json_error(['message' => $exception->getMessage()], 500);
+        }
+
+        $products = [];
+
+        if (isset($response['data']['products']) && is_array($response['data']['products'])) {
+            $products = $response['data']['products'];
+        }
+
+        $courses = [];
+
+        foreach ($products as $product) {
+            if (! is_array($product)) {
+                continue;
+            }
+
+            $course = $this->normalize_course_product($product);
+
+            if ($course === null) {
+                continue;
+            }
+
+            $courses[] = $course;
+        }
+
+        wp_send_json_success(['courses' => $courses]);
+    }
+
     private function ensure_sdk_autoload(): void
     {
         if ($this->sdk_autoloader_registered) {
@@ -502,10 +605,10 @@ final class Dragon_Zap_Affiliate
             return;
         }
 
-        $script_handle = 'dragon-zap-affiliate-related-courses-block';
+        $related_block_handle = 'dragon-zap-affiliate-related-courses-block';
 
         wp_register_script(
-            $script_handle,
+            $related_block_handle,
             $this->plugin_url('assets/js/block-related-courses.js'),
             ['wp-blocks', 'wp-element', 'wp-i18n', 'wp-components', 'wp-block-editor', 'wp-editor'],
             $this->plugin_version(),
@@ -523,7 +626,7 @@ final class Dragon_Zap_Affiliate
 
         register_block_type('dragon-zap-affiliate/related-courses', [
             'api_version' => 2,
-            'editor_script' => $script_handle,
+            'editor_script' => $related_block_handle,
             'editor_style' => $editor_style_handle,
             'style' => 'dragon-zap-affiliate-related-courses',
             'render_callback' => [$this, 'render_related_courses_block'],
@@ -570,18 +673,136 @@ final class Dragon_Zap_Affiliate
                 ],
             ],
         ]);
+
+        $single_block_handle = 'dragon-zap-affiliate-single-course-block';
+
+        wp_register_script(
+            $single_block_handle,
+            $this->plugin_url('assets/js/block-single-course.js'),
+            ['wp-blocks', 'wp-element', 'wp-i18n', 'wp-components', 'wp-block-editor', 'wp-editor'],
+            $this->plugin_version(),
+            true
+        );
+
+        wp_localize_script(
+            $single_block_handle,
+            'dragonZapAffiliateSingleCourseBlock',
+            [
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce(self::NONCE_SINGLE_COURSE),
+                'strings' => [
+                    'searchCourses' => __('Search courses', 'dragon-zap-affiliate'),
+                    'searchPlaceholder' => __('Start typing to search for a course…', 'dragon-zap-affiliate'),
+                    'searching' => __('Searching…', 'dragon-zap-affiliate'),
+                    'noResults' => __('No courses found. Try a different search term.', 'dragon-zap-affiliate'),
+                    'error' => __('Something went wrong. Please try again.', 'dragon-zap-affiliate'),
+                    'clearSelection' => __('Remove selection', 'dragon-zap-affiliate'),
+                    'selectCourse' => __('Select a course to display.', 'dragon-zap-affiliate'),
+                    'defaultHeading' => __('Featured Course', 'dragon-zap-affiliate'),
+                    'viewCourse' => __('View course', 'dragon-zap-affiliate'),
+                ],
+            ]
+        );
+
+        register_block_type('dragon-zap-affiliate/single-course', [
+            'api_version' => 2,
+            'editor_script' => $single_block_handle,
+            'editor_style' => $editor_style_handle,
+            'style' => 'dragon-zap-affiliate-related-courses',
+            'render_callback' => [$this, 'render_single_course_block'],
+            'attributes' => [
+                'title' => [
+                    'type' => 'string',
+                    'default' => __('Featured Course', 'dragon-zap-affiliate'),
+                ],
+                'showTitle' => [
+                    'type' => 'boolean',
+                    'default' => true,
+                ],
+                'courseId' => [
+                    'type' => 'integer',
+                    'default' => 0,
+                ],
+                'courseTitle' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'courseUrl' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'courseImage' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'courseDescription' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'coursePrice' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'courseCurrency' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'showImages' => [
+                    'type' => 'boolean',
+                    'default' => true,
+                ],
+                'showDescription' => [
+                    'type' => 'boolean',
+                    'default' => true,
+                ],
+                'showPrice' => [
+                    'type' => 'boolean',
+                    'default' => true,
+                ],
+                'backgroundColor' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'textColor' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'accentColor' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'borderColor' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+                'customClass' => [
+                    'type' => 'string',
+                    'default' => '',
+                ],
+            ],
+        ]);
     }
 
     public function register_widgets(): void
     {
-        $widget_file = plugin_dir_path($this->plugin_file) . 'includes/class-dragon-zap-affiliate-related-courses-widget.php';
+        $base_dir = plugin_dir_path($this->plugin_file) . 'includes/';
+        $widgets = [
+            'Dragon_Zap_Affiliate_Related_Courses_Widget' => 'class-dragon-zap-affiliate-related-courses-widget.php',
+            'Dragon_Zap_Affiliate_Single_Course_Widget' => 'class-dragon-zap-affiliate-single-course-widget.php',
+        ];
 
-        if (! class_exists('Dragon_Zap_Affiliate_Related_Courses_Widget') && file_exists($widget_file)) {
-            require_once $widget_file;
-        }
+        foreach ($widgets as $class => $file) {
+            if (! class_exists($class)) {
+                $path = $base_dir . $file;
 
-        if (class_exists('Dragon_Zap_Affiliate_Related_Courses_Widget')) {
-            register_widget('Dragon_Zap_Affiliate_Related_Courses_Widget');
+                if (file_exists($path)) {
+                    require_once $path;
+                }
+            }
+
+            if (class_exists($class)) {
+                register_widget($class);
+            }
         }
     }
 
@@ -880,6 +1101,64 @@ final class Dragon_Zap_Affiliate
         return $markup;
     }
 
+    public function render_single_course_block(array $attributes = [], string $content = '', $block = null): string
+    {
+        $course_id = isset($attributes['courseId']) ? absint($attributes['courseId']) : 0;
+        $is_editor_context = is_admin() || (function_exists('wp_is_json_request') && wp_is_json_request());
+
+        if ($course_id <= 0) {
+            return $is_editor_context
+                ? '<p>' . esc_html__('Select a Dragon Zap course to display.', 'dragon-zap-affiliate') . '</p>'
+                : '';
+        }
+
+        $course = $this->get_course_by_id($course_id);
+
+        if (! is_array($course)) {
+            return $is_editor_context
+                ? '<p>' . esc_html__('The selected course could not be loaded. Please choose another course.', 'dragon-zap-affiliate') . '</p>'
+                : '';
+        }
+
+        $title = isset($attributes['showTitle']) && ! (bool) $attributes['showTitle']
+            ? ''
+            : ((isset($attributes['title']) && is_string($attributes['title']))
+                ? $attributes['title']
+                : __('Featured Course', 'dragon-zap-affiliate'));
+
+        $show_images = isset($attributes['showImages']) ? (bool) $attributes['showImages'] : true;
+        $show_description = isset($attributes['showDescription']) ? (bool) $attributes['showDescription'] : true;
+        $show_price = isset($attributes['showPrice']) ? (bool) $attributes['showPrice'] : true;
+        $background_color = isset($attributes['backgroundColor']) && is_string($attributes['backgroundColor'])
+            ? $attributes['backgroundColor']
+            : '';
+        $text_color = isset($attributes['textColor']) && is_string($attributes['textColor'])
+            ? $attributes['textColor']
+            : '';
+        $accent_color = isset($attributes['accentColor']) && is_string($attributes['accentColor'])
+            ? $attributes['accentColor']
+            : '';
+        $border_color = isset($attributes['borderColor']) && is_string($attributes['borderColor'])
+            ? $attributes['borderColor']
+            : '';
+        $custom_class = isset($attributes['customClass']) && is_string($attributes['customClass'])
+            ? $attributes['customClass']
+            : '';
+
+        return $this->render_courses_markup([$course], [
+            'title' => $title,
+            'context' => 'single-block',
+            'show_images' => $show_images,
+            'show_description' => $show_description,
+            'show_price' => $show_price,
+            'background_color' => $background_color,
+            'text_color' => $text_color,
+            'accent_color' => $accent_color,
+            'border_color' => $border_color,
+            'custom_class' => $custom_class,
+        ]);
+    }
+
     /**
      * @param mixed $content
      * @return mixed
@@ -1078,7 +1357,7 @@ final class Dragon_Zap_Affiliate
             return [];
         }
 
-        $cache_key = $this->get_related_courses_transient_key($post_id);;
+        $cache_key = $this->get_related_courses_transient_key($post_id);
         $cached = get_transient($cache_key);
 
         if (is_array($cached)) {
@@ -1098,9 +1377,12 @@ final class Dragon_Zap_Affiliate
             return [];
         }
 
+        $fetch_limit = 12;
+        $courses_to_cache = 3;
+
         try {
             $response = $client->products()->list([
-                'per_page' => 3,
+                'per_page' => $fetch_limit,
                 'search' => $search_terms,
                 'type' => 'App\\Models\\Course',
             ]);
@@ -1110,14 +1392,11 @@ final class Dragon_Zap_Affiliate
             return [];
         }
 
-        // if the array is empty we will bring back without search terms.
-        if (empty($response['data']['products']))
-        {
-            $search_terms = '';
+        if (empty($response['data']['products']) && $search_terms !== '') {
             try {
                 $response = $client->products()->list([
-                    'per_page' => 3,
-                    'search' => $search_terms,
+                    'per_page' => $fetch_limit,
+                    'search' => '',
                     'type' => 'App\\Models\\Course',
                 ]);
             } catch (\DragonZap\AffiliateApi\Exceptions\ApiException $exception) {
@@ -1126,10 +1405,15 @@ final class Dragon_Zap_Affiliate
                 return [];
             }
         }
+
         $products = [];
 
-        if (is_array($response) && isset($response['data']['products']) && is_array($response['data']['products'])) {
-            $products = $response['data']['products'];
+        if (isset($response['data']['products']) && is_array($response['data']['products'])) {
+            $products = array_values($response['data']['products']);
+
+            if (! empty($products)) {
+                shuffle($products);
+            }
         }
 
         $courses = [];
@@ -1139,44 +1423,15 @@ final class Dragon_Zap_Affiliate
                 continue;
             }
 
-            $type = isset($product['type']) ? (string) $product['type'] : '';
+            $course = $this->normalize_course_product($product);
 
-            if ($type !== '' && $type !== 'App\\Models\\Course') {
+            if ($course === null) {
                 continue;
             }
 
-            $title = isset($product['title']) ? sanitize_text_field((string) $product['title']) : '';
-            $url = isset($product['url']) ? esc_url_raw((string) $product['url']) : '';
+            $courses[] = $course;
 
-            if ($title === '' || $url === '') {
-                continue;
-            }
-
-            $image = isset($product['image']) ? esc_url_raw((string) $product['image']) : '';
-            $description = '';
-
-            if (! empty($product['description'])) {
-                $description = wp_trim_words(wp_strip_all_tags((string) $product['description']), 24, '…');
-            }
-
-            $price = null;
-
-            if (isset($product['price']) && is_numeric($product['price'])) {
-                $price = (float) $product['price'];
-            }
-
-            $currency = isset($product['currency']) ? sanitize_text_field((string) $product['currency']) : '';
-
-            $courses[] = [
-                'title' => $title,
-                'url' => $url,
-                'image' => $image,
-                'description' => $description,
-                'price' => $price,
-                'currency' => $currency,
-            ];
-
-            if (count($courses) === 3) {
+            if (count($courses) === $courses_to_cache) {
                 break;
             }
         }
@@ -1200,46 +1455,82 @@ final class Dragon_Zap_Affiliate
             return '';
         }
 
-        if (wp_style_is('dragon-zap-affiliate-related-courses', 'registered')) {
-            wp_enqueue_style('dragon-zap-affiliate-related-courses');
-        } else {
-            wp_enqueue_style(
-                'dragon-zap-affiliate-related-courses',
-                $this->plugin_url('assets/css/related-courses.css'),
-                [],
-                $this->plugin_version()
-            );
+        $options = wp_parse_args(
+            $options,
+            [
+                'title' => __('Recommended Courses', 'dragon-zap-affiliate'),
+                'context' => 'content',
+            ]
+        );
+
+        return $this->render_courses_markup($courses, $options);
+    }
+
+    public function render_courses_markup(array $courses, array $options = []): string
+    {
+        if (empty($courses)) {
+            return '';
         }
 
-        $title = $options['title'] ?? __('Recommended Courses', 'dragon-zap-affiliate');
-        $context = isset($options['context']) ? (string) $options['context'] : '';
-        $show_images = isset($options['show_images']) ? (bool) $options['show_images'] : true;
-        $show_description = isset($options['show_description']) ? (bool) $options['show_description'] : true;
-        $show_price = isset($options['show_price']) ? (bool) $options['show_price'] : true;
-        $background_color = isset($options['background_color']) ? (string) $options['background_color'] : '';
-        $text_color = isset($options['text_color']) ? (string) $options['text_color'] : '';
-        $accent_color = isset($options['accent_color']) ? (string) $options['accent_color'] : '';
-        $border_color = isset($options['border_color']) ? (string) $options['border_color'] : '';
-        $custom_class = isset($options['custom_class']) ? (string) $options['custom_class'] : '';
+        $options = wp_parse_args(
+            $options,
+            [
+                'title' => __('Recommended Courses', 'dragon-zap-affiliate'),
+                'context' => 'content',
+                'show_images' => true,
+                'show_description' => true,
+                'show_price' => true,
+                'background_color' => '',
+                'text_color' => '',
+                'accent_color' => '',
+                'border_color' => '',
+                'custom_class' => '',
+            ]
+        );
 
-        $classes = ['dragon-zap-affiliate-related-courses'];
+        $this->enqueue_related_courses_style();
 
-        if ($context !== '') {
-            $classes[] = 'dragon-zap-affiliate-related-courses--' . sanitize_html_class($context);
+        $title = (string) $options['title'];
+        $context = isset($options['context']) ? sanitize_html_class((string) $options['context']) : 'content';
+
+        if ($context === '') {
+            $context = 'content';
         }
+
+        $show_images = (bool) $options['show_images'];
+        $show_description = (bool) $options['show_description'];
+        $show_price = (bool) $options['show_price'];
+        $background_color = (string) $options['background_color'];
+        $text_color = (string) $options['text_color'];
+        $accent_color = (string) $options['accent_color'];
+        $border_color = (string) $options['border_color'];
+        $custom_class = (string) $options['custom_class'];
+
+        $classes = [
+            'dragon-zap-affiliate-related-courses',
+            'dragon-zap-affiliate-related-courses--' . $context,
+        ];
 
         if (! $show_images) {
             $classes[] = 'dragon-zap-affiliate-related-courses--no-images';
+        }
+
+        if (! $show_description) {
+            $classes[] = 'dragon-zap-affiliate-related-courses--no-description';
+        }
+
+        if (! $show_price) {
+            $classes[] = 'dragon-zap-affiliate-related-courses--no-price';
         }
 
         if ($custom_class !== '') {
             $custom_classnames = preg_split('/\s+/', $custom_class) ?: [];
 
             foreach ($custom_classnames as $classname) {
-                $classname = trim($classname);
+                $classname = sanitize_html_class($classname);
 
                 if ($classname !== '') {
-                    $classes[] = sanitize_html_class($classname);
+                    $classes[] = $classname;
                 }
             }
         }
@@ -1280,21 +1571,27 @@ final class Dragon_Zap_Affiliate
             <?php endif; ?>
             <ul class="dragon-zap-affiliate-related-courses__list">
                 <?php foreach ($courses as $course) : ?>
+                    <?php
+                    $course_title = isset($course['title']) ? (string) $course['title'] : '';
+                    $course_url = isset($course['url']) ? (string) $course['url'] : '';
+                    $course_image = isset($course['image']) ? (string) $course['image'] : '';
+                    $course_description = isset($course['description']) ? (string) $course['description'] : '';
+                    ?>
                     <li class="dragon-zap-affiliate-related-courses__item">
-                        <?php if ($show_images && ! empty($course['image'])) : ?>
-                            <a class="dragon-zap-affiliate-related-courses__image-link" href="<?php echo esc_url($course['url']); ?>" target="_blank" rel="nofollow noopener">
-                                <img class="dragon-zap-affiliate-related-courses__image" src="<?php echo esc_url($course['image']); ?>" alt="<?php echo esc_attr($course['title']); ?>" loading="lazy" />
+                        <?php if ($show_images && $course_image !== '') : ?>
+                            <a class="dragon-zap-affiliate-related-courses__image-link" href="<?php echo esc_url($course_url); ?>" target="_blank" rel="nofollow noopener">
+                                <img class="dragon-zap-affiliate-related-courses__image" src="<?php echo esc_url($course_image); ?>" alt="<?php echo esc_attr($course_title); ?>" loading="lazy" />
                             </a>
                         <?php endif; ?>
                         <div class="dragon-zap-affiliate-related-courses__content">
-                            <a class="dragon-zap-affiliate-related-courses__title" href="<?php echo esc_url($course['url']); ?>" target="_blank" rel="nofollow noopener">
-                                <?php echo esc_html($course['title']); ?>
+                            <a class="dragon-zap-affiliate-related-courses__title" href="<?php echo esc_url($course_url); ?>" target="_blank" rel="nofollow noopener">
+                                <?php echo esc_html($course_title); ?>
                             </a>
-                            <?php if ($show_price && $course['price'] !== null) : ?>
+                            <?php if ($show_price && isset($course['price']) && $course['price'] !== null) : ?>
                                 <div class="dragon-zap-affiliate-related-courses__price"><?php echo esc_html($this->format_course_price($course)); ?></div>
                             <?php endif; ?>
-                            <?php if ($show_description && ! empty($course['description'])) : ?>
-                                <p class="dragon-zap-affiliate-related-courses__description"><?php echo esc_html($course['description']); ?></p>
+                            <?php if ($show_description && $course_description !== '') : ?>
+                                <p class="dragon-zap-affiliate-related-courses__description"><?php echo esc_html($course_description); ?></p>
                             <?php endif; ?>
                         </div>
                     </li>
@@ -1303,7 +1600,137 @@ final class Dragon_Zap_Affiliate
         </div>
         <?php
 
-        return trim((string) ob_get_clean());
+        return (string) ob_get_clean();
+    }
+
+    private function enqueue_related_courses_style(): void
+    {
+        if (wp_style_is('dragon-zap-affiliate-related-courses', 'registered')) {
+            wp_enqueue_style('dragon-zap-affiliate-related-courses');
+
+            return;
+        }
+
+        wp_register_style(
+            'dragon-zap-affiliate-related-courses',
+            $this->plugin_url('assets/css/related-courses.css'),
+            [],
+            $this->plugin_version()
+        );
+
+        wp_enqueue_style('dragon-zap-affiliate-related-courses');
+    }
+
+    private function normalize_course_product(array $product): ?array
+    {
+        $type = isset($product['type']) ? (string) $product['type'] : '';
+
+        if ($type !== '' && $type !== 'App\\Models\\Course') {
+            return null;
+        }
+
+        $title = isset($product['title']) ? sanitize_text_field((string) $product['title']) : '';
+        $url = isset($product['url']) ? esc_url_raw((string) $product['url']) : '';
+
+        if ($title === '' || $url === '') {
+            return null;
+        }
+
+        $id = 0;
+
+        if (isset($product['id']) && is_numeric($product['id'])) {
+            $id = (int) $product['id'];
+        } elseif (isset($product['product_id']) && is_numeric($product['product_id'])) {
+            $id = (int) $product['product_id'];
+        }
+
+        $image = isset($product['image']) ? esc_url_raw((string) $product['image']) : '';
+        $description = '';
+
+        if (! empty($product['description'])) {
+            $description = wp_trim_words(wp_strip_all_tags((string) $product['description']), 24, '...');
+        }
+
+        $price = null;
+
+        if (isset($product['price']) && is_numeric($product['price'])) {
+            $price = (float) $product['price'];
+        }
+
+        $currency = isset($product['currency']) ? sanitize_text_field((string) $product['currency']) : '';
+
+        return [
+            'id' => $id,
+            'title' => $title,
+            'url' => $url,
+            'image' => $image,
+            'description' => $description,
+            'price' => $price,
+            'currency' => $currency,
+        ];
+    }
+
+    public function get_course_by_id(int $course_id): ?array
+    {
+        $course_id = absint($course_id);
+
+        if ($course_id <= 0) {
+            return null;
+        }
+
+        $cache_key = $this->get_course_transient_key($course_id);
+        $cached = get_transient($cache_key);
+
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $client = $this->create_api_client();
+
+        if ($client === null) {
+            return null;
+        }
+
+        try {
+            $response = $client->products()->retrieve($course_id);
+        } catch (\DragonZap\AffiliateApi\Exceptions\ApiException $exception) {
+            return null;
+        } catch (\Throwable $exception) {
+            return null;
+        }
+
+        $product = [];
+
+        if (isset($response['data']['product']) && is_array($response['data']['product'])) {
+            $product = $response['data']['product'];
+        } elseif (isset($response['data']) && is_array($response['data'])) {
+            $product = $response['data'];
+        } elseif (isset($response['product']) && is_array($response['product'])) {
+            $product = $response['product'];
+        }
+
+        if (! $product) {
+            return null;
+        }
+
+        $course = $this->normalize_course_product($product);
+
+        if ($course === null) {
+            return null;
+        }
+
+        if (! isset($course['id']) || $course['id'] <= 0) {
+            $course['id'] = $course_id;
+        }
+
+        set_transient($cache_key, $course, 12 * HOUR_IN_SECONDS);
+
+        return $course;
+    }
+
+    private function get_course_transient_key(int $course_id): string
+    {
+        return self::COURSE_TRANSIENT_PREFIX . $course_id;
     }
 
     private function is_auto_append_enabled(): bool
@@ -1877,3 +2304,4 @@ final class Dragon_Zap_Affiliate
         return untrailingslashit($value);
     }
 }
+

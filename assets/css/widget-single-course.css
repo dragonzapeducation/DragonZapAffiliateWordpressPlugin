@@ -1,0 +1,85 @@
+.dragon-zap-affiliate-course-selected {
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 12px;
+    background: #f8fafc;
+}
+
+.dragon-zap-affiliate-course-selected__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.dragon-zap-affiliate-course-selected__image {
+    max-width: 64px;
+    height: auto;
+    border-radius: 4px;
+}
+
+.dragon-zap-affiliate-course-selected__title {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.dragon-zap-affiliate-course-selected__price {
+    display: inline-block;
+    margin-bottom: 4px;
+    color: #475569;
+}
+
+.dragon-zap-affiliate-course-results {
+    display: none;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid #cbd5f5;
+    border-radius: 4px;
+    max-height: 240px;
+    overflow-y: auto;
+    background: #fff;
+}
+
+.dragon-zap-affiliate-course-results__item + .dragon-zap-affiliate-course-results__item {
+    border-top: 1px solid #e2e8f0;
+}
+
+.dragon-zap-affiliate-course-results__item--empty,
+.dragon-zap-affiliate-course-results__item--status {
+    padding: 10px 12px;
+    color: #475569;
+}
+
+.dragon-zap-affiliate-course-results__button {
+    width: 100%;
+    padding: 10px 12px;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.dragon-zap-affiliate-course-results__button:focus,
+.dragon-zap-affiliate-course-results__button:hover {
+    outline: none;
+    background: #eff6ff;
+}
+
+.dragon-zap-affiliate-course-results__title {
+    display: block;
+    font-weight: 600;
+}
+
+.dragon-zap-affiliate-course-results__price {
+    display: block;
+    color: #475569;
+    margin-top: 2px;
+}
+
+.dragon-zap-affiliate-course-results__description {
+    display: block;
+    color: #64748b;
+    margin-top: 4px;
+    font-size: 12px;
+}
+
