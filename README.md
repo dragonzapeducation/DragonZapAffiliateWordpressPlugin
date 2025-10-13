@@ -22,3 +22,11 @@ The plugin analyses the current blog post title, tags, and categories to query t
 Widget output includes the course title, featured image, price, and a short description with affiliate tracking links. Styling is provided via the bundled `assets/css/related-courses.css` file and adapts to the context when displayed in content or a sidebar. You can customise the widget appearance (colours, visibility of images/descriptions/prices, and additional CSS classes) from either the Widgets screen or the block inspector controls. Built-in WordPress colour pickers make it easy to preview background, text, accent, and border colour updates before saving.
 
 In block-based themes or the Widgets screen, add the **Dragon Zap Related Courses** block to any widget area. The block provides controls to toggle the heading, switch on or off specific course details, adjust colours, and supply custom CSS classes while rendering the same content as the classic widget on the front end. A new setting in **Settings → Dragon Zap Affiliate** lets you disable the automatic placement so you can position the widget or block exactly where you need it.
+
+## License
+
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program; if not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt>.
