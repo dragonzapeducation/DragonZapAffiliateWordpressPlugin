@@ -880,7 +880,7 @@ final class Dragon_Zap_Affiliate
         $profiles_error = isset($profiles['error']) && is_string($profiles['error']) ? $profiles['error'] : '';
         $profile_field_id = 'dragon-zap-affiliate-blog-profile-' . $post->ID;
 
-        if (! empty($profile_items)) {
+        if ($profiles_error === '') {
             $options = [];
 
             foreach ($profile_items as $profile) {
@@ -928,17 +928,16 @@ final class Dragon_Zap_Affiliate
 
             echo '</select>';
             echo '</p>';
+
+            if (empty($profile_items)) {
+                echo '<p class="description">' . esc_html__('No blog profiles were returned. Choose "Create new profile" to add one.', 'dragon-zap-affiliate') . '</p>';
+            }
         } else {
             echo '<p>';
             echo '<label for="' . esc_attr($profile_field_id) . '">' . esc_html__('Blog profile ID', 'dragon-zap-affiliate') . '</label><br />';
             echo '<input type="number" min="1" step="1" name="dragon_zap_affiliate_blog_profile_id" id="' . esc_attr($profile_field_id) . '" value="' . esc_attr($selected_profile) . '" class="small-text" />';
             echo '</p>';
-        }
-
-        if ($profiles_error !== '') {
             echo '<p class="description">' . esc_html($profiles_error) . '</p>';
-        } elseif (empty($profile_items)) {
-            echo '<p class="description">' . esc_html__('No blog profiles were returned. Create one in your Dragon Zap dashboard or enter the profile ID manually.', 'dragon-zap-affiliate') . '</p>';
         }
 
         $categories = $this->get_blog_categories();
